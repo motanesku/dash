@@ -193,7 +193,7 @@ export default function Club() {
                         <span className={`mono ${pnlClass(inv.roi)}`} style={{fontSize:12,fontWeight:600}}>{fmtPct(inv.roi)}</span>
                       </td>
                       {isAdmin&&<td>
-                        <div style={{display:'flex',gap:4'}}>
+                        <div style={{display:'flex',gap:4}}>
                           <button className="btn btn-ghost btn-sm" onClick={()=>{setEditInv(inv);setInvForm({name:inv.name,color:inv.color});setShowInvModal(true)}}>✏</button>
                           <button className="btn btn-danger btn-sm" onClick={()=>delInv(inv.id)}>✕</button>
                         </div>
