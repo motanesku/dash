@@ -68,14 +68,17 @@ export function aggregatePositions(positions) {
 }
 
 // ── Formatting ─────────────────────────────────────────────
+const VALID_CURRENCIES = new Set(['USD','EUR','RON','GBP','CHF','JPY','CAD','AUD','HUF','CZK','PLN','SEK','NOK','DKK','BTC','ETH']);
+
 export function fmtC(n, currency = 'USD') {
   if (n == null || isNaN(n)) return '—';
+  const cur = VALID_CURRENCIES.has(String(currency).toUpperCase()) ? String(currency).toUpperCase() : 'USD';
   try {
     return new Intl.NumberFormat('ro-RO', {
-      style: 'currency', currency,
+      style: 'currency', currency: cur,
       minimumFractionDigits: 2, maximumFractionDigits: 2
     }).format(n);
-  } catch { return `${n.toFixed(2)} ${currency}`; }
+  } catch { return `${n.toFixed(2)} ${cur}`; }
 }
 
 export function fmtPct(n, showSign = true) {
