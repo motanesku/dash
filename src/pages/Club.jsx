@@ -116,10 +116,10 @@ export default function Club() {
           <div>
             <div className="label" style={{marginBottom:6,color:'var(--blue)'}}>Valoare Actuală Club (RON)</div>
             <div className="mono" style={{fontSize:26,fontWeight:700,color:'var(--blue)'}}>
-              {new Intl.NumberFormat('ro-RO',{style:'currency',currency:'RON',minimumFractionDigits:2}).format(displayValue)}
+              {fmtC(displayValue,'RON')}
             </div>
             {displayValue>0&&totalInvested>0&&<div className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontSize:13,marginTop:4}}>
-              {new Intl.NumberFormat('ro-RO',{style:'currency',currency:'RON',minimumFractionDigits:2}).format(displayValue-totalInvested)} · {fmtPct((displayValue-totalInvested)/totalInvested*100)}
+              {fmtC(displayValue-totalInvested,'RON')} · {fmtPct((displayValue-totalInvested)/totalInvested*100)}
             </div>}
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
