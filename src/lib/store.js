@@ -3,7 +3,32 @@ import { fetchPrices, fetchFearGreed, MARKET_SYMBOLS } from './prices.js';
 import { calcPortfolio } from './portfolio.js';
 import { loadTransactions, saveTransactionsLocal, addTransaction, updateTransaction, deleteTransaction, bulkAddTransactions, loadBrokers, saveBrokers, loadAlerts, saveAlerts, loadClub, saveClub } from './sheets.js';
 
+const PRICES_CACHE_KEY = 'ptf_v6_prices';
+const MARKET_CACHE_KEY = 'ptf_v6_market';
+const FEARGREED_CACHE_KEY = 'ptf_v6_feargreed';
+
+function readCache(key) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } catch { return null; }
+}
+function writeCache(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+}
+
+// Load cached prices immediately on startup
+const cachedPrices = readCache(PRICES_CACHE_KEY) || {};
+const cachedMarket = readCache(MARKET_CACHE_KEY) || {};
+const cachedFG = readCache(FEARGREED_CACHE_KEY);
+
 const useStore = create((set, get) => ({
+  // ── Theme ───────────────────────────────────────────────
+  theme: localStorage.getItem('ptf_theme') || 'dark',
+  toggleTheme: () => set(s => {
+    const next = s.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('ptf_theme', next);
+    document.documentElement.setAttribute('data-theme', next === 'light' ? 'light' : '');
+    return { theme: next };
+  }),
+
   // ── Auth ────────────────────────────────────────────────
   isAdmin: false,
   setAdmin: (v) => set({ isAdmin: v }),
@@ -11,7 +36,7 @@ const useStore = create((set, get) => ({
   // ── Navigation ─────────────────────────────────────────
   tab: 'dashboard',
   setTab: (tab) => set({ tab }),
-  brokerTab: null, // null = all (TOTAL)
+  brokerTab: null,
 
   // ── Brokers ─────────────────────────────────────────────
   brokers: loadBrokers(),
@@ -21,8 +46,7 @@ const useStore = create((set, get) => ({
     const brokers = [...get().brokers];
     if (brokers.includes(n)) return;
     const next = [...brokers, n];
-    saveBrokers(next);
-    set({ brokers: next });
+    saveBrokers(next); set({ brokers: next });
   },
   deleteBroker: (name) => {
     const next = get().brokers.filter(b => b !== name);
@@ -32,7 +56,8 @@ const useStore = create((set, get) => ({
   setBrokerTab: (b) => set({ brokerTab: b }),
 
   // ── Transactions ────────────────────────────────────────
-  txs: [],
+  // Start with cached txs immediately — page renders instantly
+  txs: readCache('ptf_v6_local') || [],
   cloudLoading: false,
   cloudErr: null,
 
@@ -53,19 +78,16 @@ const useStore = create((set, get) => ({
     saveTransactionsLocal(get().txs);
     await addTransaction(newTx);
   },
-
   updateTx: async (tx) => {
     set(s => ({ txs: s.txs.map(t => t.id === tx.id ? tx : t) }));
     saveTransactionsLocal(get().txs);
     await updateTransaction(tx);
   },
-
   deleteTx: async (id) => {
     set(s => ({ txs: s.txs.filter(t => t.id !== id) }));
     saveTransactionsLocal(get().txs);
     await deleteTransaction(id);
   },
-
   bulkAddTxs: async (txs) => {
     const newTxs = txs.map(t => ({ ...t, id: Date.now() + Math.random() }));
     set(s => ({ txs: [...s.txs, ...newTxs] }));
@@ -73,10 +95,10 @@ const useStore = create((set, get) => ({
     await bulkAddTransactions(newTxs);
   },
 
-  // ── Prices ──────────────────────────────────────────────
-  prices: {},
-  marketData: {},
-  fearGreed: null,
+  // ── Prices — start with cache, update in background ─────
+  prices: cachedPrices,
+  marketData: cachedMarket,
+  fearGreed: cachedFG,
   pricesLoading: false,
   pricesUpdated: null,
 
@@ -89,40 +111,40 @@ const useStore = create((set, get) => ({
 
     set({ pricesLoading: true });
     try {
-      const allPrices = await fetchPrices(allSyms);
+      // Fetch prices + fear&greed in PARALLEL
+      const [allPrices] = await Promise.all([
+        fetchPrices(allSyms),
+        fetchFearGreed().then(fg => {
+          if (fg) { set({ fearGreed: fg }); writeCache(FEARGREED_CACHE_KEY, fg); }
+        }),
+      ]);
       const prices = {};
       const marketData = {};
       portfolioSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       marketSyms.forEach(s => { if (allPrices[s]) marketData[s] = allPrices[s]; });
       set({ prices, marketData, pricesLoading: false, pricesUpdated: new Date() });
+      // Cache for next visit
+      writeCache(PRICES_CACHE_KEY, prices);
+      writeCache(MARKET_CACHE_KEY, marketData);
     } catch (e) {
       set({ pricesLoading: false });
     }
-    // Fear & greed separately
-    fetchFearGreed().then(fg => { if (fg) set({ fearGreed: fg }); });
   },
 
-  // ── Portfolio computed (derived) ─────────────────────────
+  // ── Portfolio computed ───────────────────────────────────
   getPortfolio: () => {
     const { txs, prices } = get();
     return calcPortfolio(txs, prices);
   },
 
   // ── Club ────────────────────────────────────────────────
-  club: {
-    name: 'Investment Club',
-    totalValue: 0,
-    investors: [],
-    contributions: [],
-  },
+  club: { name: 'Investment Club', totalValue: 0, investors: [], contributions: [] },
   clubLoaded: false,
-
   loadClub: async () => {
     const club = await loadClub();
     if (club) set({ club, clubLoaded: true });
     else set({ clubLoaded: true });
   },
-
   updateClub: async (club) => {
     set({ club });
     await saveClub(club);
@@ -132,13 +154,11 @@ const useStore = create((set, get) => ({
   alerts: loadAlerts(),
   addAlert: (alert) => {
     const next = [...get().alerts, { ...alert, id: Date.now(), triggered: false }];
-    set({ alerts: next });
-    saveAlerts(next);
+    set({ alerts: next }); saveAlerts(next);
   },
   deleteAlert: (id) => {
     const next = get().alerts.filter(a => a.id !== id);
-    set({ alerts: next });
-    saveAlerts(next);
+    set({ alerts: next }); saveAlerts(next);
   },
   checkAlerts: (prices) => {
     const alerts = get().alerts;
@@ -150,7 +170,6 @@ const useStore = create((set, get) => ({
       const hit = a.direction === 'above' ? p >= a.target : p <= a.target;
       if (hit) {
         changed = true;
-        // Browser notification
         if (Notification.permission === 'granted') {
           new Notification(`📈 Alert: ${a.symbol}`, {
             body: `Prețul a ajuns la ${p.toFixed(2)} (target: ${a.target})`,
