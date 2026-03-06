@@ -77,7 +77,6 @@ export function calcPortfolio(txs, prices) {
   });
   // Only include fully closed (no open lots remaining)
   const closedPositions = Object.entries(closedAgg)
-    .filter(([key]) => !openMap[key])
     .map(([, v]) => ({
       ...v,
       roi: v.totalCost > 0 ? (v.totalProfit / v.totalCost) * 100 : 0,
