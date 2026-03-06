@@ -4,8 +4,8 @@ const TABS = [
   { id:'dashboard',    icon:'◈', label:'Dashboard' },
   { id:'positions',    icon:'▦', label:'Poziții' },
   { id:'fox',          icon:'🦊', label:'FOX' },
-  { id:'transactions', icon:'≡', label:'Tranzacții' },
   { id:'club',         icon:'◉', label:'Club' },
+  { id:'transactions', icon:'≡', label:'Tranzacții' },
 ]
 
 export default function Nav() {
@@ -15,7 +15,7 @@ export default function Nav() {
       display:'flex',alignItems:'center',padding:'0 20px',
       borderBottom:'1px solid var(--border)',
       background:'var(--bg2)',
-      overflowX:'auto',WebkitOverflowScrolling:'touch',gap:2
+      overflowX:'auto',WebkitOverflowScrolling:'touch',gap:2,
     }}>
       {TABS.map(t=>(
         <button key={t.id} onClick={()=>setTab(t.id)} style={{
