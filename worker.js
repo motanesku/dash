@@ -31,6 +31,9 @@ export default {
       if (path === '/api/history') {
         return await handleHistory(url, env);
       }
+      if (path === '/api/info') {
+        return handleInfo(url, env);
+      }
       if (path === '/api/feargreed') {
         return await handleFearGreed(env);
       }
@@ -160,6 +163,59 @@ async function handleHistory(url, env) {
   } catch (e) {
     return json({ ok: false, error: e.message });
   }
+}
+
+// ── /api/info?symbols=AAPL,MSFT ─────────────────────────────
+async function handleInfo(url, env) {
+  const syms = (url.searchParams.get('symbols') || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!syms.length) return json({ ok: true, info: {} });
+
+  const cacheKey = 'info:' + syms.sort().join(',');
+  if (env.CACHE) {
+    const cached = await env.CACHE.get(cacheKey);
+    if (cached) return json({ ok: true, info: JSON.parse(cached), cached: true });
+  }
+
+  const info = {};
+  for (const sym of syms) {
+    try {
+      const url2 = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=summaryProfile,assetProfile,summaryDetail,defaultKeyStatistics`;
+      const r = await fetch(url2, {
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      const j = await r.json();
+      const res = j?.quoteSummary?.result?.[0];
+      const profile = res?.summaryProfile || res?.assetProfile || {};
+      const stats = res?.defaultKeyStatistics || {};
+      const detail = res?.summaryDetail || {};
+
+      // Market cap classification
+      const mktCap = stats.marketCap?.raw || detail.marketCap?.raw || 0;
+      let cap = '';
+      if (mktCap > 200e9) cap = 'Large Cap';
+      else if (mktCap > 10e9) cap = 'Mid Cap';
+      else if (mktCap > 2e9) cap = 'Small Cap';
+      else if (mktCap > 0) cap = 'Micro Cap';
+
+      info[sym] = {
+        sector: profile.sector || '',
+        industry: profile.industry || '',
+        domain: profile.industry || profile.sector || '',
+        cap,
+        country: profile.country || '',
+        website: profile.website || '',
+        description: (profile.longBusinessSummary || '').slice(0, 200),
+      };
+    } catch (e) {
+      info[sym] = { sector: '', industry: '', domain: '', cap: '' };
+    }
+  }
+
+  if (env.CACHE) {
+    await env.CACHE.put(cacheKey, JSON.stringify(info), { expirationTtl: 86400 }); // cache 24h
+  }
+  return json({ ok: true, info });
 }
 
 // ── /api/feargreed ─────────────────────────────────────────
