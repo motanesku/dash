@@ -16,7 +16,7 @@ export default function Header({ onPinClick, onAddTx, onImport, onAlerts, onRefr
     <header style={{
       display:'flex', alignItems:'center', justifyContent:'space-between',
       padding:'0 20px', height:56,
-      background: theme === 'light' ? 'rgba(255,255,255,0.92)' : 'rgba(13,17,23,0.92)',
+      background: theme === 'light' ? 'rgba(244,246,251,0.96)' : 'rgba(13,17,23,0.92)',
       backdropFilter:'blur(12px)',
       borderBottom:'1px solid var(--border)',
       position:'sticky', top:0, zIndex:50,
