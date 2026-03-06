@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import useStore from '../lib/store.js'
-import { calcPortfolio, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
+
+
+const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
+const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
 const CAP_COLORS = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
@@ -164,7 +168,7 @@ export default function Positions({ onEditTx }) {
           <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
             <table className="data-table" style={{minWidth:700}}>
               <thead><tr>
-                <th>Symbol / Domeniu</th>
+                <th style={STICKY_H}>Symbol / Domeniu</th>
                 <th>Acțiuni · Avg</th>
                 <th>Preț · Δ azi</th>
                 <th style={{textAlign:'right'}}>Nerealizat · %</th>
@@ -177,7 +181,7 @@ export default function Positions({ onEditTx }) {
                   return (
                     <tr key={p.broker+p.symbol} style={{cursor:'pointer'}}
                       onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
-                      <td>
+                      <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                         <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
                         <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
                           <span>{p.name}</span>
@@ -239,7 +243,7 @@ export default function Positions({ onEditTx }) {
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
               <table className="data-table" style={{minWidth:600}}>
                 <thead><tr>
-                  <th>Symbol / Domeniu</th>
+                  <th style={STICKY_H}>Symbol / Domeniu</th>
                   <th>Broker</th>
                   <th>Acțiuni</th>
                   <th style={{textAlign:'right'}}>Profit Realizat</th>
@@ -251,7 +255,7 @@ export default function Positions({ onEditTx }) {
                     const info = companyInfo[p.symbol] || {}
                     return (
                       <tr key={i}>
-                        <td>
+                        <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                           <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
                           <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',gap:4,flexWrap:'wrap'}}>
                             {info.domain&&<span style={{color:'var(--blue)'}}>{info.domain}</span>}
@@ -267,7 +271,7 @@ export default function Positions({ onEditTx }) {
                           <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:13,fontWeight:700}}>{fmtPct(p.roi)}</span>
                         </td>
                         <td style={{textAlign:'right'}} className="hide-mobile">
-                          <span style={{fontSize:11,color:'var(--text3)'}}>{p.lastDate||'—'}</span>
+                          <span style={{fontSize:11,color:'var(--text3)'}}>{fmtDate(p.lastDate)}</span>
                         </td>
                       </tr>
                     )
