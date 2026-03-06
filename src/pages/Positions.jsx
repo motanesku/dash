@@ -4,40 +4,62 @@ import { calcPortfolio, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
-const SECTOR_LABELS = {
-  'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍',
-  'Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','—':'·'
-}
+const CAP_COLORS = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
 
 export default function Positions({ onEditTx }) {
-  const txs = useStore(s => s.txs)
-  const prices = useStore(s => s.prices)
-  const brokerTab = useStore(s => s.brokerTab)
+  const txs          = useStore(s => s.txs)
+  const prices       = useStore(s => s.prices)
+  const brokerTab    = useStore(s => s.brokerTab)
   const setBrokerTab = useStore(s => s.setBrokerTab)
-  const brokers = useStore(s => s.brokers)
-  const isAdmin = useStore(s => s.isAdmin)
-  const foxData = useStore(s => s.foxData)
+  const brokers      = useStore(s => s.brokers)
+  const isAdmin      = useStore(s => s.isAdmin)
+  const companyInfo  = useStore(s => s.companyInfo)
 
-  const { positions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
+  const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
-  const [sortBy, setSortBy] = useState('value')
+  const [sortBy, setSortBy]           = useState('value')
+  const [view, setView]               = useState('open') // 'open' | 'closed'
 
-  const filteredPos = useMemo(() => {
-    const arr = brokerTab ? positions.filter(p=>p.broker===brokerTab) : positions
+  // Per-broker stats
+  const brokerStats = useMemo(() => {
+    const stats = {}
+    brokers.forEach(b => {
+      const bPos  = positions.filter(p => p.broker === b)
+      const bVal  = bPos.reduce((s,p) => s + (p.curValue||0), 0)
+      const bCost = bPos.reduce((s,p) => s + p.costBasis, 0)
+      const bUnr  = bPos.reduce((s,p) => s + (p.unrealizedPnl||0), 0)
+      const bReal = bPos.reduce((s,p) => s + p.realizedPnl, 0)
+      const bCash = cashByBroker[b] || 0
+      stats[b] = {
+        val: bVal, cost: bCost, unrealized: bUnr, realized: bReal,
+        cash: bCash, roi: bCost > 0 ? (bUnr / bCost) * 100 : null,
+        count: bPos.length,
+      }
+    })
+    return stats
+  }, [brokers, positions, cashByBroker])
+
+  const totalCash = Object.values(cashByBroker).reduce((s,v) => s+v, 0)
+
+  const filteredOpen = useMemo(() => {
+    const arr = brokerTab ? positions.filter(p => p.broker === brokerTab) : positions
     return [...arr].sort((a,b) => {
-      if (sortBy==='value') return (b.curValue||0)-(a.curValue||0)
-      if (sortBy==='unrealized') return (b.unrealizedPct||0)-(a.unrealizedPct||0)
-      if (sortBy==='daychange') return (b.dayChange||0)-(a.dayChange||0)
+      if (sortBy==='value')      return (b.curValue||0) - (a.curValue||0)
+      if (sortBy==='unrealized') return (b.unrealizedPct||0) - (a.unrealizedPct||0)
+      if (sortBy==='daychange')  return (b.dayChange||0) - (a.dayChange||0)
       return 0
     })
   }, [positions, brokerTab, sortBy])
 
-  const cash = cashByBroker
-  const cashTotal = brokerTab ? (cash[brokerTab]||0) : Object.values(cash).reduce((s,v)=>s+v,0)
-  const totalVal = filteredPos.reduce((s,p)=>s+(p.curValue||0),0)
-  const totalCost = filteredPos.reduce((s,p)=>s+p.costBasis,0)
-  const totalUnrealized = filteredPos.reduce((s,p)=>s+(p.unrealizedPnl||0),0)
-  const totalRealized = filteredPos.reduce((s,p)=>s+p.realizedPnl,0)
+  const filteredClosed = useMemo(() => {
+    const arr = brokerTab ? closedPositions.filter(p => p.broker === brokerTab) : closedPositions
+    return [...arr].sort((a,b) => b.totalProfit - a.totalProfit)
+  }, [closedPositions, brokerTab])
+
+  const totalVal       = filteredOpen.reduce((s,p) => s + (p.curValue||0), 0)
+  const totalCost      = filteredOpen.reduce((s,p) => s + p.costBasis, 0)
+  const totalUnrealized = filteredOpen.reduce((s,p) => s + (p.unrealizedPnl||0), 0)
+  const totalRealized  = filteredOpen.reduce((s,p) => s + p.realizedPnl, 0)
 
   const SortBtn = ({val,label}) => (
     <button onClick={()=>setSortBy(val)} style={{
@@ -49,118 +71,227 @@ export default function Positions({ onEditTx }) {
 
   return (
     <div className="fade-up">
+
+      {/* Cash banner */}
+      <div style={{display:'flex',gap:8,marginBottom:14,overflowX:'auto',paddingBottom:2}}>
+        <div style={{
+          display:'flex',alignItems:'center',gap:10,padding:'8px 16px',
+          background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',
+          borderRadius:8,flexShrink:0,
+        }}>
+          <span style={{fontSize:14}}>💵</span>
+          <div>
+            <div className="label" style={{marginBottom:1}}>Cash Total</div>
+            <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:14}}>{fmtC(totalCash)}</div>
+          </div>
+        </div>
+        {brokers.map((b,i) => {
+          const cash = cashByBroker[b] || 0
+          if (cash === 0) return null
+          return (
+            <div key={b} style={{
+              display:'flex',alignItems:'center',gap:8,padding:'8px 14px',
+              background:'var(--surface)',border:`1px solid ${BROKER_COLORS[i%BROKER_COLORS.length]}40`,
+              borderRadius:8,flexShrink:0,
+            }}>
+              <span style={{width:7,height:7,borderRadius:'50%',background:BROKER_COLORS[i%BROKER_COLORS.length],flexShrink:0}}/>
+              <div>
+                <div className="label" style={{marginBottom:1}}>{b}</div>
+                <div className="mono" style={{fontWeight:600,fontSize:13,color:BROKER_COLORS[i%BROKER_COLORS.length]}}>{fmtC(cash)}</div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
       {/* Broker tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:16,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4}}>
+      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4}}>
         <button onClick={()=>setBrokerTab(null)} style={{
-          padding:'8px 16px',borderRadius:8,border:`2px solid ${!brokerTab?'var(--blue)':'var(--border2)'}`,
+          padding:'8px 16px',borderRadius:8,
+          border:`2px solid ${!brokerTab?'var(--blue)':'var(--border2)'}`,
           background:!brokerTab?'var(--blue-bg)':'var(--surface)',
           color:!brokerTab?'var(--blue)':'var(--text3)',
           fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
         }}>TOTAL · {positions.length} poz.</button>
-        {brokers.map((b,i)=>{
-          const bPos=positions.filter(p=>p.broker===b)
-          const bVal=bPos.reduce((s,p)=>s+(p.curValue||0),0)
-          const bCost=bPos.reduce((s,p)=>s+p.costBasis,0)
-          const bRoi=bCost>0?((bVal-bCost)/bCost)*100:null
-          const active=brokerTab===b
-          return(
+        {brokers.map((b,i) => {
+          const st = brokerStats[b]
+          const active = brokerTab === b
+          const c = BROKER_COLORS[i%BROKER_COLORS.length]
+          return (
             <button key={b} onClick={()=>setBrokerTab(b)} style={{
               display:'flex',alignItems:'center',gap:6,padding:'8px 16px',borderRadius:8,
-              border:`2px solid ${active?BROKER_COLORS[i%BROKER_COLORS.length]:'var(--border2)'}`,
-              background:active?`${BROKER_COLORS[i%BROKER_COLORS.length]}15`:'var(--surface)',
-              color:active?BROKER_COLORS[i%BROKER_COLORS.length]:'var(--text3)',
+              border:`2px solid ${active?c:'var(--border2)'}`,
+              background:active?`${c}15`:'var(--surface)',
+              color:active?c:'var(--text3)',
               fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
             }}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:BROKER_COLORS[i%BROKER_COLORS.length],flexShrink:0}}/>
+              <span style={{width:7,height:7,borderRadius:'50%',background:c,flexShrink:0}}/>
               {b}
-              {bRoi!=null&&<span className="mono" style={{fontSize:10,fontWeight:700,color:active?'inherit':bRoi>=0?'var(--green)':'var(--red)'}}>
-                {bRoi>=0?'+':''}{bRoi.toFixed(1)}%
+              {st?.roi!=null && <span className="mono" style={{fontSize:10,fontWeight:700,color:active?'inherit':st.roi>=0?'var(--green)':'var(--red)'}}>
+                {st.roi>=0?'+':''}{st.roi.toFixed(1)}%
               </span>}
+              <span className="mono" style={{fontSize:10,color:active?'inherit':'var(--text3)'}}>{st?.count||0}</span>
             </button>
           )
         })}
       </div>
 
-      {/* Sort */}
-      <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center'}}>
-        <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)',marginRight:4}}>SORT:</span>
-        <SortBtn val="value" label="VALOARE"/>
-        <SortBtn val="unrealized" label="P&L%"/>
-        <SortBtn val="daychange" label="ZI%"/>
+      {/* Open / Closed toggle */}
+      <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+        {[
+          {id:'open',   label:`▶ Deschise (${filteredOpen.length})`},
+          {id:'closed', label:`✓ Închise (${filteredClosed.length})`},
+        ].map(t => (
+          <button key={t.id} onClick={()=>setView(t.id)} style={{
+            padding:'5px 14px',borderRadius:6,border:'none',cursor:'pointer',fontSize:11,fontWeight:600,
+            background:view===t.id?'var(--blue)':'var(--surface2)',
+            color:view===t.id?'#fff':'var(--text3)',transition:'all .15s',
+          }}>{t.label}</button>
+        ))}
+        {view==='open' && (
+          <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center'}}>
+            <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)'}}>SORT:</span>
+            <SortBtn val="value"      label="VALOARE"/>
+            <SortBtn val="unrealized" label="P&L%"/>
+            <SortBtn val="daychange"  label="ZI%"/>
+          </div>
+        )}
       </div>
 
-      <div className="card" style={{overflow:'hidden',marginBottom:16}}>
-        <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-          <table className="data-table" style={{minWidth:680}}>
-            <thead><tr>
-              <th>Symbol / Domeniu</th>
-              <th>Acțiuni · Avg</th>
-              <th>Preț · Δ azi</th>
-              <th style={{textAlign:'right'}}>Nerealizat</th>
-              <th style={{textAlign:'right'}} className="hide-mobile">Realizat</th>
-              <th style={{textAlign:'right'}}>Valoare</th>
-            </tr></thead>
-            <tbody>
-              {filteredPos.map(p=>{
-                const fox = foxData.find(f=>f.symbol===p.symbol)
-                const sector = fox?.sector||'—'
-                const cap = fox?.cap||''
-                return(
-                  <tr key={p.broker+p.symbol} style={{cursor:'pointer'}} onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
-                    <td>
-                      <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
-                      <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-                        <span>{p.name}</span>
-                        <span style={{background:'var(--surface2)',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)',fontSize:9}}>{p.broker}</span>
-                        {sector!=='—'&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_LABELS[sector]||'·'} {sector}</span>}
-                        {cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{cap}</span>}
-                        {p.marketState==='PRE'&&<span className="badge badge-gold" style={{fontSize:8}}>PRE</span>}
-                        {p.marketState==='POST'&&<span className="badge" style={{fontSize:8,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>POST</span>}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="mono" style={{fontSize:12}}>{p.shares.toFixed(4)}</div>
-                      <div className="mono" style={{fontSize:10,color:'var(--text3)'}}>avg {fmtC(p.avgPrice,p.currency)}</div>
-                    </td>
-                    <td>
-                      <div className="mono" style={{fontSize:12}}>{p.curPrice?fmtC(p.curPrice,p.currency):'—'}</div>
-                      <div className={`mono ${pnlClass(p.dayChange)}`} style={{fontSize:10}}>{p.dayChange!=null?fmtPct(p.dayChange):'—'}</div>
-                    </td>
-                    <td style={{textAlign:'right'}}>
-                      <div className={`mono ${pnlClass(p.unrealizedPnl)}`} style={{fontSize:12,fontWeight:600}}>{p.unrealizedPnl!=null?fmtC(p.unrealizedPnl,p.currency):'—'}</div>
-                      <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
-                    </td>
-                    <td style={{textAlign:'right'}} className="hide-mobile">
-                      <div className="mono" style={{fontSize:12,color:p.realizedPnl!==0?(p.realizedPnl>0?'var(--purple)':'var(--red)'):'var(--text3)'}}>{p.realizedPnl!==0?fmtC(p.realizedPnl,p.currency):'—'}</div>
-                    </td>
-                    <td style={{textAlign:'right'}}>
-                      <div className="mono" style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{p.curValue?fmtC(p.curValue,p.currency):'—'}</div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="total-row">
-                <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL {brokerTab||'PORTOFOLIU'}</td>
-                <td/><td/>
-                <td style={{textAlign:'right'}}>
-                  <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontWeight:700}}>{fmtC(totalUnrealized)}</div>
-                  <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontSize:10}}>{totalCost>0?fmtPct(totalUnrealized/totalCost*100):''}</div>
-                </td>
-                <td style={{textAlign:'right'}} className="hide-mobile">
-                  <div className="mono" style={{color:'var(--purple)',fontWeight:700}}>{fmtC(totalRealized)}</div>
-                </td>
-                <td style={{textAlign:'right'}}>
-                  <div className="mono" style={{fontWeight:700,color:'var(--text)',fontSize:14}}>{fmtC(totalVal)}</div>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+      {/* ── OPEN POSITIONS ── */}
+      {view === 'open' && (
+        <div className="card" style={{overflow:'hidden',marginBottom:16}}>
+          <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+            <table className="data-table" style={{minWidth:700}}>
+              <thead><tr>
+                <th>Symbol / Domeniu</th>
+                <th>Acțiuni · Avg</th>
+                <th>Preț · Δ azi</th>
+                <th style={{textAlign:'right'}}>Nerealizat · %</th>
+                <th style={{textAlign:'right'}} className="hide-mobile">Realizat</th>
+                <th style={{textAlign:'right'}}>Valoare</th>
+              </tr></thead>
+              <tbody>
+                {filteredOpen.map(p => {
+                  const info = companyInfo[p.symbol] || {}
+                  return (
+                    <tr key={p.broker+p.symbol} style={{cursor:'pointer'}}
+                      onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
+                      <td>
+                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
+                        <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                          <span>{p.name}</span>
+                          <span style={{background:'var(--surface2)',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)',fontSize:9}}>{p.broker}</span>
+                          {info.domain&&<span style={{fontSize:9,color:'var(--blue)'}}>{info.domain}</span>}
+                          {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="mono" style={{fontSize:12}}>{p.shares.toFixed(4)}</div>
+                        <div className="mono" style={{fontSize:10,color:'var(--text3)'}}>avg {fmtC(p.avgPrice,p.currency)}</div>
+                      </td>
+                      <td>
+                        <div className="mono" style={{fontSize:12}}>{p.curPrice?fmtC(p.curPrice,p.currency):'—'}</div>
+                        <div className={`mono ${pnlClass(p.dayChange)}`} style={{fontSize:10}}>{p.dayChange!=null?fmtPct(p.dayChange):'—'}</div>
+                      </td>
+                      <td style={{textAlign:'right'}}>
+                        <div className={`mono ${pnlClass(p.unrealizedPnl)}`} style={{fontSize:12,fontWeight:600}}>{p.unrealizedPnl!=null?fmtC(p.unrealizedPnl,p.currency):'—'}</div>
+                        <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
+                      </td>
+                      <td style={{textAlign:'right'}} className="hide-mobile">
+                        <div className="mono" style={{fontSize:12,color:p.realizedPnl!==0?(p.realizedPnl>0?'var(--purple)':'var(--red)'):'var(--text3)'}}>{p.realizedPnl!==0?fmtC(p.realizedPnl,p.currency):'—'}</div>
+                      </td>
+                      <td style={{textAlign:'right'}}>
+                        <div className="mono" style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{p.curValue?fmtC(p.curValue,p.currency):'—'}</div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="total-row">
+                  <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL {brokerTab||'PORTOFOLIU'}</td>
+                  <td style={{textAlign:'right'}}>
+                    <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontWeight:700}}>{fmtC(totalUnrealized)}</div>
+                    <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontSize:10}}>{totalCost>0?fmtPct(totalUnrealized/totalCost*100):''}</div>
+                  </td>
+                  <td style={{textAlign:'right'}} className="hide-mobile">
+                    <div className="mono" style={{color:'var(--purple)',fontWeight:700}}>{fmtC(totalRealized)}</div>
+                  </td>
+                  <td style={{textAlign:'right'}}>
+                    <div className="mono" style={{fontWeight:700,color:'var(--text)',fontSize:14}}>{fmtC(totalVal)}</div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {selectedPos&&(
+      {/* ── CLOSED POSITIONS ── */}
+      {view === 'closed' && (
+        <div className="card" style={{overflow:'hidden',marginBottom:16}}>
+          {filteredClosed.length === 0 ? (
+            <div style={{padding:'40px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
+              Nicio poziție închisă{brokerTab ? ` pentru ${brokerTab}` : ''}.
+            </div>
+          ) : (
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table className="data-table" style={{minWidth:600}}>
+                <thead><tr>
+                  <th>Symbol / Domeniu</th>
+                  <th>Broker</th>
+                  <th>Acțiuni</th>
+                  <th style={{textAlign:'right'}}>Profit Realizat</th>
+                  <th style={{textAlign:'right'}}>ROI</th>
+                  <th style={{textAlign:'right'}} className="hide-mobile">Ultima vânzare</th>
+                </tr></thead>
+                <tbody>
+                  {filteredClosed.map((p,i) => {
+                    const info = companyInfo[p.symbol] || {}
+                    return (
+                      <tr key={i}>
+                        <td>
+                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
+                          <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',gap:4,flexWrap:'wrap'}}>
+                            {info.domain&&<span style={{color:'var(--blue)'}}>{info.domain}</span>}
+                            {info.cap&&<span style={{padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`,fontSize:9}}>{info.cap}</span>}
+                          </div>
+                        </td>
+                        <td><span style={{fontSize:11,color:'var(--text3)'}}>{p.broker}</span></td>
+                        <td><span className="mono" style={{fontSize:12}}>{p.trades.reduce((s,t)=>s+t.shares,0).toFixed(2)}</span></td>
+                        <td style={{textAlign:'right'}}>
+                          <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:13,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
+                        </td>
+                        <td style={{textAlign:'right'}}>
+                          <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:13,fontWeight:700}}>{fmtPct(p.roi)}</span>
+                        </td>
+                        <td style={{textAlign:'right'}} className="hide-mobile">
+                          <span style={{fontSize:11,color:'var(--text3)'}}>{p.lastDate||'—'}</span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="total-row">
+                    <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
+                    <td style={{textAlign:'right'}}>
+                      <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
+                        {fmtC(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}
+                      </span>
+                    </td>
+                    <td colSpan={2}/>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chart for selected position */}
+      {selectedPos && view==='open' && (
         <div className="card fade-up" style={{padding:'16px 18px',marginBottom:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <div>
