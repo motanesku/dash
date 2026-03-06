@@ -32,7 +32,12 @@ function MarketTicker() {
             onMouseLeave={e=>e.currentTarget.style.transform=''}>
             <div className="label" style={{marginBottom:4}}>{label}</div>
             <div className="mono" style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>
-              {d ? new Intl.NumberFormat('ro-RO',{minimumFractionDigits:sym==='^VIX'||sym==='EURUSD=X'||sym==='RON=X'?4:0,maximumFractionDigits:2}).format(d.price) : '—'}
+              {d ? (()=>{
+                try {
+                  const digits = (sym==='^VIX'||sym==='EURUSD=X'||sym==='RON=X') ? 4 : 2
+                  return new Intl.NumberFormat('ro-RO',{minimumFractionDigits:digits,maximumFractionDigits:digits}).format(d.price)
+                } catch { return d.price?.toFixed(2) ?? '—' }
+              })() : '—'}
             </div>
             {chg!=null&&<div className="mono" style={{fontSize:10,color:isPos?'var(--green)':'var(--red)',marginTop:2}}>
               {isPos?'+':''}{chg.toFixed(2)}%
