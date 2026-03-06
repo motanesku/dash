@@ -1,6 +1,10 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
-import { fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
+
+
+const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
+const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
 const CAPS    = ['Large Cap','Mid Cap','Small Cap','Micro Cap']
 const SECTORS = ['Tech','Finance','Health','Energy','Consumer','Industrial','Materials','Utilities','Real Estate','Telecom','Other']
@@ -319,7 +323,7 @@ export default function FoxPositions() {
                   {isAdmin&&<th style={{background:'var(--surface2)'}}/>}
                 </tr>
                 <tr>
-                  <th>Symbol</th>
+                  <th style={STICKY_H}>Symbol</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Sector · Cap</th>
                   <th>Acțiuni</th>
                   <th>Preț Mediu</th>
@@ -337,7 +341,7 @@ export default function FoxPositions() {
                   <tr key={f.id} style={{
                     background: f.inBuyZone?'rgba(0,212,170,0.04)':f.inSellZone?'rgba(240,180,41,0.04)':'',
                   }}>
-                    <td>
+                    <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                       <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{f.symbol}</div>
                       <div style={{fontSize:10,color:'var(--text3)',marginTop:1}}>{f.name}</div>
                     </td>
