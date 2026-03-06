@@ -57,7 +57,6 @@ function MarketCard({ sym, label, d, history }) {
 // ── Market Ticker ─────────────────────────────────────────────
 function MarketTicker() {
   const marketData = useStore(s=>s.marketData)
-  const fearGreed  = useStore(s=>s.fearGreed)
   const [histories, setHistories] = useState({})
 
   useEffect(()=>{
@@ -75,17 +74,7 @@ function MarketTicker() {
       {MARKET_SYMBOLS.map(({sym,label})=>(
         <MarketCard key={sym} sym={sym} label={label} d={marketData[sym]} history={histories[sym]}/>
       ))}
-      {fearGreed&&(()=>{
-        const v=fearGreed.value
-        const color=v<=25?'var(--red)':v<=45?'var(--gold)':v<=55?'var(--text3)':v<=75?'var(--green)':'#00d4aa'
-        return(
-          <div className="card" style={{padding:'10px 14px',minWidth:110,flexShrink:0,borderLeft:`2px solid ${color}`}}>
-            <div className="label" style={{marginBottom:6}}>Fear & Greed</div>
-            <div className="mono" style={{fontSize:18,fontWeight:700,color,lineHeight:1}}>{v}</div>
-            <div style={{fontSize:9,color,fontWeight:600,marginTop:4,whiteSpace:'nowrap'}}>{fearGreed.label}</div>
-          </div>
-        )
-      })()}
+
     </div>
   )
 }
