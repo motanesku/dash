@@ -150,11 +150,48 @@ const useStore = create((set, get) => ({
     await saveClub(club);
   },
 
+  // ── Company Info (sector, cap, domain) ─────────────────────
+  companyInfo: (() => { try { const s=localStorage.getItem('ptf_v6_compinfo'); return s?JSON.parse(s):{}; } catch{return {};} })(),
+
+  fetchCompanyInfo: async (symbols) => {
+    if (!symbols.length) return;
+    try {
+      const { fetchCompanyInfo } = await import('./prices.js');
+      const info = await fetchCompanyInfo(symbols);
+      const merged = { ...get().companyInfo, ...info };
+      set({ companyInfo: merged });
+      try { localStorage.setItem('ptf_v6_compinfo', JSON.stringify(merged)); } catch {}
+    } catch {}
+  },
+
   // ── FOX Positions ───────────────────────────────────────────
   foxData: (() => { try { const s=localStorage.getItem('ptf_v6_fox'); return s?JSON.parse(s):[]; } catch{return [];} })(),
-  setFoxData: (data) => {
+  setFoxData: async (data) => {
     set({ foxData: data });
     try { localStorage.setItem('ptf_v6_fox', JSON.stringify(data)); } catch {}
+    // Sync to Google Sheets
+    const { SCRIPT_URL, USE_CLOUD } = await import('../config.js');
+    if (USE_CLOUD) {
+      try {
+        await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'saveFox', data }) });
+      } catch {}
+    }
+  },
+
+  loadFoxData: async () => {
+    const { SCRIPT_URL, USE_CLOUD } = await import('../config.js');
+    if (USE_CLOUD) {
+      try {
+        const r = await fetch(`${SCRIPT_URL}?action=getFox`);
+        const j = await r.json();
+        if (j.ok && j.data?.length) {
+          set({ foxData: j.data });
+          try { localStorage.setItem('ptf_v6_fox', JSON.stringify(j.data)); } catch {}
+          return;
+        }
+      } catch {}
+    }
+    // fallback localStorage already loaded on init
   },
 
   // ── Price Alerts ─────────────────────────────────────────
