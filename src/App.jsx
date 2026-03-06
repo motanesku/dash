@@ -13,7 +13,7 @@ import ImportModal from './components/ImportModal.jsx'
 import AlertsPanel from './components/AlertsPanel.jsx'
 
 export default function App() {
-  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, txs, prices, checkAlerts, pricesUpdated, theme } = useStore()
+  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, loadFoxData, fetchCompanyInfo, txs, prices, checkAlerts, pricesUpdated, theme } = useStore()
   const [showPin, setShowPin] = useState(false)
   const [showAddTx, setShowAddTx] = useState(false)
   const [editTx, setEditTx] = useState(null)
@@ -28,11 +28,17 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '')
     loadTxs()
     loadClubData()
+    loadFoxData()
     if (Notification.permission === 'default') Notification.requestPermission()
   }, [])
 
   useEffect(() => {
-    if (txs.length) fetchRef.current()
+    if (txs.length) {
+      fetchRef.current()
+      // Fetch company info for all symbols
+      const syms = [...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol))]
+      fetchCompanyInfo(syms)
+    }
   }, [txs.map(t => t.symbol).join(',')])
 
   useEffect(() => {
