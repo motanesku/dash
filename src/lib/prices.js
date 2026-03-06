@@ -134,3 +134,17 @@ export const MARKET_SYMBOLS = [
   { sym: 'EURUSD=X', label: 'EUR/USD' },
   { sym: 'RON=X', label: 'USD/RON' },
 ];
+
+// ── Company Info (sector, cap, domain) ─────────────────────
+export async function fetchCompanyInfo(symbols) {
+  if (!symbols.length) return {};
+  try {
+    const { WORKER_URL, USE_WORKER } = await import('../config.js');
+    if (!USE_WORKER) return {};
+    const url = `${WORKER_URL}/api/info?symbols=${encodeURIComponent(symbols.join(','))}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const j = await r.json();
+    if (j.ok) return j.info;
+  } catch {}
+  return {};
+}
