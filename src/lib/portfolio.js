@@ -1,108 +1,105 @@
 // ── FIFO Portfolio Engine ──────────────────────────────────
 
 export function calcPortfolio(txs, prices) {
-  // Per broker+symbol: FIFO lots
-  const openLots = {};   // key -> [{shares, price, date}]
-  const closedPos = {};  // key -> [{symbol, broker, shares, buyPrice, sellPrice, buyDate, sellDate, profit, roi}]
+  const openLots      = {};  // key -> [{shares, price, date}]
+  const realizedTrades = {}; // key -> [{shares, buyPrice, sellPrice, buyDate, sellDate, profit, roi}]
   const realizedByKey = {};
 
-  const sorted = [...txs].filter(t => t.type !== 'DEPOSIT').sort((a,b) => new Date(a.date)-new Date(b.date));
+  const sorted = [...txs]
+    .filter(t => t.type !== 'DEPOSIT')
+    .sort((a,b) => new Date(a.date) - new Date(b.date));
 
   sorted.forEach(t => {
     const key = `${t.broker}::${t.symbol}`;
-    if (!openLots[key]) openLots[key] = [];
-    if (!closedPos[key]) closedPos[key] = [];
-    if (!realizedByKey[key]) realizedByKey[key] = 0;
+    if (!openLots[key])       openLots[key]       = [];
+    if (!realizedTrades[key]) realizedTrades[key] = [];
+    if (!realizedByKey[key])  realizedByKey[key]  = 0;
 
     if (t.type === 'BUY') {
       openLots[key].push({ shares: t.shares, price: t.price, date: t.date });
     } else if (t.type === 'SELL') {
       let remaining = t.shares;
       while (remaining > 0.00001 && openLots[key].length > 0) {
-        const lot = openLots[key][0];
+        const lot    = openLots[key][0];
         const filled = Math.min(lot.shares, remaining);
         const profit = (t.price - lot.price) * filled;
         realizedByKey[key] += profit;
-        closedPos[key].push({
-          symbol: t.symbol, broker: t.broker,
+        realizedTrades[key].push({
           shares: filled,
           buyPrice: lot.price, sellPrice: t.price,
-          buyDate: lot.date, sellDate: t.date,
-          profit, roi: lot.price > 0 ? ((t.price - lot.price) / lot.price) * 100 : 0,
+          buyDate: lot.date,   sellDate: t.date,
+          profit,
+          roi: lot.price > 0 ? ((t.price - lot.price) / lot.price) * 100 : 0,
         });
         lot.shares -= filled;
-        remaining -= filled;
+        remaining  -= filled;
         if (lot.shares < 0.00001) openLots[key].shift();
       }
     }
   });
 
-  // Build open positions
-  const openMap = {};
-  Object.entries(openLots).forEach(([key, lots]) => {
-    const totalShares = lots.reduce((s,l) => s + l.shares, 0);
-    if (totalShares < 0.00001) return;
-    const totalCost = lots.reduce((s,l) => s + l.shares * l.price, 0);
-    const [broker, symbol] = key.split('::');
-    openMap[key] = { symbol, broker, shares: totalShares, costBasis: totalCost, realizedPnl: realizedByKey[key] || 0, lots };
-  });
+  // ── Open positions (still have lots) ──
+  const positions = Object.entries(openLots)
+    .filter(([, lots]) => lots.reduce((s,l) => s+l.shares, 0) > 0.00001)
+    .map(([key, lots]) => {
+      const [broker, symbol] = key.split('::');
+      const shares     = lots.reduce((s,l) => s+l.shares, 0);
+      const costBasis  = lots.reduce((s,l) => s+l.shares*l.price, 0);
+      const realizedPnl = realizedByKey[key] || 0;
+      const pd         = prices[symbol];
+      const avgPrice   = shares > 0 ? costBasis / shares : 0;
+      const curPrice   = pd?.price   ?? null;
+      const currency   = pd?.currency ?? 'USD';
+      const name       = pd?.name     ?? symbol;
+      const curValue   = curPrice != null ? curPrice * shares : null;
+      const unrealizedPnl  = curValue != null ? curValue - costBasis : null;
+      const unrealizedPct  = costBasis > 0 && unrealizedPnl != null ? (unrealizedPnl/costBasis)*100 : null;
+      const dayChange  = pd?.prev && curPrice ? ((curPrice-pd.prev)/pd.prev)*100 : null;
+      return {
+        symbol, broker, shares, costBasis, realizedPnl, lots,
+        avgPrice, curPrice, currency, name,
+        curValue, unrealizedPnl, unrealizedPct, dayChange,
+        marketState: pd?.marketState ?? 'CLOSED',
+      };
+    })
+    .sort((a,b) => (b.curValue ?? 0) - (a.curValue ?? 0));
 
-  const positions = Object.values(openMap).map(p => {
-    const pd = prices[p.symbol];
-    const avgPrice = p.shares > 0 ? p.costBasis / p.shares : 0;
-    const curPrice = pd?.price ?? null;
-    const currency = pd?.currency ?? 'USD';
-    const name = pd?.name ?? p.symbol;
-    const curValue = curPrice != null ? curPrice * p.shares : null;
-    const unrealizedPnl = curValue != null ? curValue - p.costBasis : null;
-    const unrealizedPct = p.costBasis > 0 && unrealizedPnl != null ? (unrealizedPnl / p.costBasis) * 100 : null;
-    const dayChange = pd?.prev && curPrice ? ((curPrice - pd.prev) / pd.prev) * 100 : null;
-    return {
-      ...p, avgPrice, curPrice, currency, name,
-      curValue, unrealizedPnl, unrealizedPct, dayChange,
-      marketState: pd?.marketState ?? 'CLOSED',
-    };
-  }).sort((a,b) => (b.curValue ?? 0) - (a.curValue ?? 0));
-
-  // Build closed positions (aggregate by symbol+broker)
-  const closedAgg = {};
-  Object.values(closedPos).forEach(trades => {
-    trades.forEach(t => {
-      const key = `${t.broker}::${t.symbol}`;
-      if (!closedAgg[key]) closedAgg[key] = { symbol: t.symbol, broker: t.broker, trades: [], totalProfit: 0, totalCost: 0 };
-      closedAgg[key].trades.push(t);
-      closedAgg[key].totalProfit += t.profit;
-      closedAgg[key].totalCost += t.buyPrice * t.shares;
-    });
-  });
-  // Only include fully closed (no open lots remaining)
-  const closedPositions = Object.entries(closedAgg)
-    .map(([, v]) => ({
-      ...v,
-      roi: v.totalCost > 0 ? (v.totalProfit / v.totalCost) * 100 : 0,
-      lastDate: v.trades[v.trades.length-1]?.sellDate,
-    }))
+  // ── Closed positions (aggregated per broker::symbol, only if trades exist) ──
+  // Include even if symbol still has open lots (partial sells)
+  const closedPositions = Object.entries(realizedTrades)
+    .filter(([, trades]) => trades.length > 0)
+    .map(([key, trades]) => {
+      const [broker, symbol] = key.split('::');
+      const totalProfit = trades.reduce((s,t) => s+t.profit, 0);
+      const totalCost   = trades.reduce((s,t) => s+t.buyPrice*t.shares, 0);
+      const totalShares = trades.reduce((s,t) => s+t.shares, 0);
+      return {
+        symbol, broker, trades, totalProfit, totalCost, totalShares,
+        roi:      totalCost > 0 ? (totalProfit/totalCost)*100 : 0,
+        lastDate: trades[trades.length-1]?.sellDate,
+      };
+    })
     .sort((a,b) => b.totalProfit - a.totalProfit);
 
-  // Cash by broker
+  // ── Cash by broker ──
   const cashByBroker = {};
   txs.forEach(t => {
     if (!cashByBroker[t.broker]) cashByBroker[t.broker] = 0;
-    if (t.type === 'DEPOSIT') cashByBroker[t.broker] += t.price;
-    else if (t.type === 'BUY') cashByBroker[t.broker] -= t.shares * t.price;
-    else if (t.type === 'SELL') cashByBroker[t.broker] += t.shares * t.price;
+    if      (t.type === 'DEPOSIT') cashByBroker[t.broker] += t.price;
+    else if (t.type === 'BUY')     cashByBroker[t.broker] -= t.shares * t.price;
+    else if (t.type === 'SELL')    cashByBroker[t.broker] += t.shares * t.price;
   });
 
   return { positions, closedPositions, cashByBroker };
 }
 
 export function aggregatePositions(positions) {
-  const totalCostBasis   = positions.reduce((s,p) => s + p.costBasis, 0);
-  const totalCurValue    = positions.reduce((s,p) => s + (p.curValue ?? 0), 0);
-  const totalUnrealized  = positions.reduce((s,p) => s + (p.unrealizedPnl ?? 0), 0);
-  const totalRealized    = positions.reduce((s,p) => s + p.realizedPnl, 0);
-  const uPct = totalCostBasis > 0 ? (totalUnrealized / totalCostBasis) * 100 : 0;
-  const rPct = totalCostBasis > 0 ? (totalRealized   / totalCostBasis) * 100 : 0;
+  const totalCostBasis  = positions.reduce((s,p) => s+p.costBasis, 0);
+  const totalCurValue   = positions.reduce((s,p) => s+(p.curValue ?? 0), 0);
+  const totalUnrealized = positions.reduce((s,p) => s+(p.unrealizedPnl ?? 0), 0);
+  const totalRealized   = positions.reduce((s,p) => s+p.realizedPnl, 0);
+  const uPct = totalCostBasis > 0 ? (totalUnrealized/totalCostBasis)*100 : 0;
+  const rPct = totalCostBasis > 0 ? (totalRealized  /totalCostBasis)*100 : 0;
   return { totalCostBasis, totalCurValue, totalUnrealized, totalRealized, uPct, rPct };
 }
 
@@ -130,6 +127,16 @@ export function fmtN(n, d = 4) {
 export function pnlClass(n) {
   if (n == null || isNaN(n)) return 'muted';
   return n >= 0 ? 'pos' : 'neg';
+}
+
+export function fmtDate(d) {
+  if (!d) return '—';
+  try {
+    const s = String(d).slice(0,10);
+    const [y,m,day] = s.split('-');
+    if (!y||!m||!day) return String(d).slice(0,10);
+    return `${day.padStart(2,'0')}.${m.padStart(2,'0')}.${y}`;
+  } catch { return String(d).slice(0,10); }
 }
 
 export function excelDate(v) {
