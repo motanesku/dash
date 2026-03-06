@@ -4,6 +4,7 @@ import Header from './components/Header.jsx'
 import Nav from './components/Nav.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Positions from './pages/Positions.jsx'
+import FoxPositions from './pages/FoxPositions.jsx'
 import Transactions from './pages/Transactions.jsx'
 import Club from './pages/Club.jsx'
 import PinModal from './components/PinModal.jsx'
@@ -12,7 +13,7 @@ import ImportModal from './components/ImportModal.jsx'
 import AlertsPanel from './components/AlertsPanel.jsx'
 
 export default function App() {
-  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, txs, prices, checkAlerts, pricesUpdated } = useStore()
+  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, txs, prices, checkAlerts, pricesUpdated, theme } = useStore()
   const [showPin, setShowPin] = useState(false)
   const [showAddTx, setShowAddTx] = useState(false)
   const [editTx, setEditTx] = useState(null)
@@ -23,6 +24,8 @@ export default function App() {
   useEffect(() => { fetchRef.current = fetchAllPrices }, [fetchAllPrices])
 
   useEffect(() => {
+    // Apply saved theme on mount
+    document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '')
     loadTxs()
     loadClubData()
     if (Notification.permission === 'default') Notification.requestPermission()
@@ -47,7 +50,9 @@ export default function App() {
     <div className="app-shell">
       <div style={{
         position:'fixed',inset:0,zIndex:0,pointerEvents:'none',
-        background:'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(77,159,255,0.06) 0%, transparent 70%)',
+        background: theme==='light'
+          ? 'radial-gradient(ellipse 80% 40% at 50% -5%, rgba(26,111,212,0.04) 0%, transparent 70%)'
+          : 'radial-gradient(ellipse 80% 40% at 50% -5%, rgba(88,166,255,0.05) 0%, transparent 70%)',
       }}/>
       <Header
         onPinClick={() => setShowPin(true)}
@@ -57,9 +62,10 @@ export default function App() {
         onRefresh={fetchAllPrices}
       />
       <Nav />
-      <main style={{flex:1,padding:'20px 20px 40px',maxWidth:1400,width:'100%',margin:'0 auto',position:'relative',zIndex:1}}>
+      <main style={{flex:1,padding:'20px 20px 60px',maxWidth:1400,width:'100%',margin:'0 auto',position:'relative',zIndex:1}}>
         {tab === 'dashboard'    && <Dashboard />}
         {tab === 'positions'    && <Positions onEditTx={openAddTx} />}
+        {tab === 'fox'          && <FoxPositions />}
         {tab === 'transactions' && <Transactions onEditTx={openAddTx} />}
         {tab === 'club'         && <Club />}
       </main>
