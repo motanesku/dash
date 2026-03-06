@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react'
 import useStore from '../lib/store.js'
-import { fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
+
+const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
+const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
+
+
 
 const CLUB_COLORS = ['#4d9fff','#00d4aa','#a78bfa','#f0b429','#ff4d6a','#34d399','#fb923c','#60a5fa','#f472b6','#a3e635']
 
@@ -166,7 +171,7 @@ export default function Club() {
             <div style={{overflowX:'auto'}}>
               <table className="data-table" style={{minWidth:500}}>
                 <thead><tr>
-                  <th>Investitor</th>
+                  <th style={STICKY_H}>Investitor</th>
                   <th style={{textAlign:'right'}}>Investit</th>
                   <th style={{textAlign:'right'}}>Stake %</th>
                   <th style={{textAlign:'right'}}>Val. Actuală</th>
@@ -177,7 +182,7 @@ export default function Club() {
                 <tbody>
                   {stats.map(inv=>(
                     <tr key={inv.id}>
-                      <td>
+                      <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <span style={{width:10,height:10,borderRadius:'50%',background:inv.color,flexShrink:0}}/>
                           <span style={{fontWeight:600}}>{inv.name}</span>
@@ -225,7 +230,7 @@ export default function Club() {
           <div style={{overflowX:'auto'}}>
             <table className="data-table" style={{minWidth:400}}>
               <thead><tr>
-                <th>Lună</th>
+                <th style={STICKY_H}>Lună</th>
                 {stats.map(inv=><th key={inv.id} style={{textAlign:'right',color:inv.color}}>{inv.name}</th>)}
                 <th style={{textAlign:'right'}}>Total</th>
                 {isAdmin&&<th/>}
