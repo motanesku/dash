@@ -150,6 +150,13 @@ const useStore = create((set, get) => ({
     await saveClub(club);
   },
 
+  // ── FOX Positions ───────────────────────────────────────────
+  foxData: (() => { try { const s=localStorage.getItem('ptf_v6_fox'); return s?JSON.parse(s):[]; } catch{return [];} })(),
+  setFoxData: (data) => {
+    set({ foxData: data });
+    try { localStorage.setItem('ptf_v6_fox', JSON.stringify(data)); } catch {}
+  },
+
   // ── Price Alerts ─────────────────────────────────────────
   alerts: loadAlerts(),
   addAlert: (alert) => {
