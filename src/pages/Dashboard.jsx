@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import useStore from '../lib/store.js'
-import { aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import { MARKET_SYMBOLS } from '../lib/prices.js'
 import PriceChart from '../components/PriceChart.jsx'
 
@@ -8,8 +8,8 @@ const COLORS = ['#4d9fff','#00d4aa','#a78bfa','#f0b429','#ff4d6a','#34d399','#fb
 
 function StatCard({ label, value, sub, subClass, accent, delay=0 }) {
   return (
-    <div className={`card fade-up delay-${delay}`} style={{padding:'18px 20px',borderLeft:`3px solid ${accent||'var(--border)'}`, position:'relative',overflow:'hidden'}}>
-      <div style={{position:'absolute',top:0,right:0,width:60,height:60,borderRadius:'50%',background:`${accent||'transparent'}10`,transform:'translate(20px,-20px)'}}/>
+    <div className={`card fade-up delay-${delay}`} style={{padding:'18px 20px',borderLeft:`3px solid ${accent||'var(--border)'}`,position:'relative',overflow:'hidden'}}>
+      <div style={{position:'absolute',top:0,right:0,width:60,height:60,borderRadius:'50%',background:`${accent||'transparent'}15`,transform:'translate(20px,-20px)'}}/>
       <div className="label" style={{marginBottom:8}}>{label}</div>
       <div className="mono" style={{fontSize:18,fontWeight:700,color:'var(--text)',marginBottom:4}}>{value}</div>
       {sub&&<div className={`mono ${subClass||''}`} style={{fontSize:12}}>{sub}</div>}
@@ -18,8 +18,8 @@ function StatCard({ label, value, sub, subClass, accent, delay=0 }) {
 }
 
 function MarketTicker() {
-  const { marketData, fearGreed } = useStore()
-
+  const marketData = useStore(s => s.marketData)
+  const fearGreed = useStore(s => s.fearGreed)
   return (
     <div style={{display:'flex',gap:8,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,marginBottom:20}}>
       {MARKET_SYMBOLS.map(({sym,label})=>{
@@ -42,9 +42,9 @@ function MarketTicker() {
       })}
       {fearGreed&&(()=>{
         const v = fearGreed.value
-        const color = v<=25?'var(--red)':v<=45?'var(--gold)':v<=55?'var(--text3)':v<=75?'var(--green)':'#00ff88'
+        const color = v<=25?'var(--red)':v<=45?'var(--gold)':v<=55?'var(--text3)':v<=75?'var(--green)':'#00d4aa'
         return (
-          <div className="card" style={{padding:'10px 14px',minWidth:100,flexShrink:0,borderLeft:`3px solid ${color}`}}>
+          <div className="card" style={{padding:'10px 14px',minWidth:110,flexShrink:0,borderLeft:`3px solid ${color}`}}>
             <div className="label" style={{marginBottom:4}}>Fear & Greed</div>
             <div className="mono" style={{fontSize:16,fontWeight:700,color}}>{v}</div>
             <div style={{fontSize:9,color,fontWeight:600,marginTop:2,whiteSpace:'nowrap'}}>{fearGreed.label}</div>
@@ -80,9 +80,26 @@ function AllocBar({ positions }) {
   )
 }
 
+function SkeletonCard() {
+  return (
+    <div className="card" style={{padding:'18px 20px'}}>
+      <div className="skeleton" style={{height:10,width:80,marginBottom:12}}/>
+      <div className="skeleton" style={{height:22,width:120,marginBottom:8}}/>
+      <div className="skeleton" style={{height:12,width:60}}/>
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const { getPortfolio, marketData, txs } = useStore()
-  const { positions, cashByBroker } = useMemo(getPortfolio, [getPortfolio])
+  const txs = useStore(s => s.txs)
+  const prices = useStore(s => s.prices)
+  const marketData = useStore(s => s.marketData)
+  const cloudLoading = useStore(s => s.cloudLoading)
+  const pricesLoading = useStore(s => s.pricesLoading)
+  const hasCachedData = Object.keys(prices).length > 0 || txs.length > 0
+  const isFirstLoad = cloudLoading && !hasCachedData
+
+  const { positions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const agg = useMemo(() => aggregatePositions(positions), [positions])
   const cashTotal = Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const totalWithCash = agg.totalCurValue + cashTotal
@@ -93,27 +110,35 @@ export default function Dashboard() {
 
   return (
     <div className="fade-up">
+      {/* Subtle update indicator */}
+      {pricesLoading && hasCachedData && (
+        <div style={{
+          position:'fixed', bottom:20, right:20, zIndex:99,
+          background:'var(--surface)', border:'1px solid var(--border2)',
+          borderRadius:8, padding:'8px 14px',
+          display:'flex', alignItems:'center', gap:8,
+          fontSize:11, color:'var(--text3)', fontFamily:'var(--mono)',
+          boxShadow:'var(--shadow)',
+        }}>
+          <span style={{animation:'pulse 1s infinite',display:'inline-block'}}>⟳</span> actualizare prețuri...
+        </div>
+      )}
       <MarketTicker />
-
-      {/* Stat cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:20}}>
         <StatCard delay={1} label="Valoare Totală" value={fmtC(agg.totalCurValue)} sub={`${positions.length} poziții`} accent="var(--blue)"/>
         <StatCard delay={2} label="Cost Investit" value={fmtC(agg.totalCostBasis)} sub={`${txs.filter(t=>t.type!=='DEPOSIT').length} tranzacții`} accent="var(--text3)"/>
         <StatCard delay={3} label="Profit Nerealizat" value={fmtC(agg.totalUnrealized)}
-          sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)+'mono'}
+          sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)}
           accent={agg.totalUnrealized>=0?'var(--green)':'var(--red)'}/>
         <StatCard delay={4} label="Profit Realizat" value={fmtC(agg.totalRealized)}
-          sub={fmtPct(agg.rPct)} subClass={pnlClass(agg.totalRealized)+'mono'}
+          sub={fmtPct(agg.rPct)} subClass={pnlClass(agg.totalRealized)}
           accent="var(--purple)"/>
         <StatCard delay={5} label="💵 Cash Total" value={fmtC(cashTotal)} sub={fmtPct(cashPct,false)+' din port.'} accent="var(--gold)"/>
       </div>
 
-      {/* Charts + Alloc row */}
       {positions.length > 0 && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:14,marginBottom:20}}>
           <AllocBar positions={positions}/>
-
-          {/* SP500 vs Portfolio comparison */}
           <div className="card" style={{padding:'16px 18px'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
               <div className="label">S&P 500 vs Portofoliu</div>
@@ -131,7 +156,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {positions.length === 0 && (
+      {positions.length === 0 && isFirstLoad && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:20}}>
+          {[1,2,3,4,5].map(i=><SkeletonCard key={i}/>)}
+        </div>
+      )}
+
+      {positions.length === 0 && !isFirstLoad && (
         <div className="card" style={{padding:'60px 20px',textAlign:'center'}}>
           <div style={{fontSize:40,marginBottom:12}}>📊</div>
           <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>Nicio poziție încă</div>
