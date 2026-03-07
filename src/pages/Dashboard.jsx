@@ -148,7 +148,8 @@ function SectorPieChart({ positions, companyInfo }) {
   const hov = hovered ? slices.find(s => s.sector === hovered) : null
 
   return (
-    <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:24,alignItems:'center'}}>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
+      <div style={{display:'flex',flexWrap:'wrap',gap:24,alignItems:'center',justifyContent:'center',width:'100%'}}>
       <div style={{position:'relative',flexShrink:0}}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           {slices.map((s, i) => (
@@ -172,8 +173,9 @@ function SectorPieChart({ positions, companyInfo }) {
           </text>
         </svg>
       </div>
+      </div>
       {/* Legend */}
-      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+      <div style={{display:'flex',flexDirection:'column',gap:6,width:'100%',maxWidth:320}}>
         {slices.map((s, i) => (
           <div key={i} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',
             opacity: hovered && hovered !== s.sector ? 0.4 : 1, transition:'opacity .2s'}}
@@ -379,10 +381,10 @@ export default function Dashboard() {
 
       {positions.length>0&&(
         <div className="card fade-up delay-5" style={{padding:'16px 18px',marginBottom:20}}>
-          <div style={{display:'flex',gap:6,marginBottom:14,borderBottom:'1px solid var(--border)',paddingBottom:12}}>
+          <div style={{display:'flex',gap:5,marginBottom:14,borderBottom:'1px solid var(--border)',paddingBottom:12,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
             {CHART_TABS.map(t=>(
               <button key={t.id} onClick={()=>setChartTab(t.id)} style={{
-                padding:'5px 12px',borderRadius:6,border:'none',cursor:'pointer',
+                padding:'5px 10px',borderRadius:6,border:'none',cursor:'pointer',flexShrink:0,
                 background:chartTab===t.id?'var(--blue)':'var(--surface2)',
                 color:chartTab===t.id?'#fff':'var(--text3)',
                 fontSize:11,fontWeight:600,transition:'all .15s',
