@@ -104,7 +104,7 @@ const useStore = create((set, get) => ({
 
   fetchAllPrices: async () => {
     const { txs } = get();
-    const portfolioSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol))];
+    const portfolioSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol || t.sym).filter(Boolean))];
     const marketSyms = MARKET_SYMBOLS.map(s => s.sym);
     const allSyms = [...new Set([...portfolioSyms, ...marketSyms])];
     if (!allSyms.length) return;
