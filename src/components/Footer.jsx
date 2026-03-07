@@ -60,7 +60,7 @@ export default function Footer() {
           opacity:0.5,
           letterSpacing:'0.08em',
         }}>
-          OR · PORTFOLIO TRACKER
+          PORTFOLIO TRACKER
         </span>
       </div>
     </footer>
