@@ -165,15 +165,28 @@ const useStore = create((set, get) => ({
   },
 
   // ── FOX Positions ───────────────────────────────────────────
-  foxData: (() => { try { const s=localStorage.getItem('ptf_v6_fox'); return s?JSON.parse(s):[]; } catch{return [];} })(),
+  // ptf_v6_fox2 = clean key (avoids old contaminated data with BUY/SELL txs)
+  foxData: (() => {
+    try {
+      const s = localStorage.getItem('ptf_v6_fox2');
+      if (s) {
+        const arr = JSON.parse(s);
+        // Filter out any accidentally imported transactions (they have type:BUY/SELL)
+        return arr.filter(f => !f.type || f.type === 'FOX');
+      }
+      return [];
+    } catch { return []; }
+  })(),
+
   setFoxData: async (data) => {
-    set({ foxData: data });
-    try { localStorage.setItem('ptf_v6_fox', JSON.stringify(data)); } catch {}
-    // Sync to Google Sheets
+    const clean = data.filter(f => !f.type || f.type === 'FOX');
+    set({ foxData: clean });
+    try { localStorage.setItem('ptf_v6_fox2', JSON.stringify(clean)); } catch {}
+    // Sync to Google Sheets (FOX sheet)
     const { SCRIPT_URL, USE_CLOUD } = await import('../config.js');
     if (USE_CLOUD) {
       try {
-        await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'saveFox', data }) });
+        await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'saveFox', data: clean }) });
       } catch {}
     }
   },
@@ -184,14 +197,15 @@ const useStore = create((set, get) => ({
       try {
         const r = await fetch(`${SCRIPT_URL}?action=getFox`);
         const j = await r.json();
-        if (j.ok && j.data?.length) {
-          set({ foxData: j.data });
-          try { localStorage.setItem('ptf_v6_fox', JSON.stringify(j.data)); } catch {}
+        if (j.ok && Array.isArray(j.data)) {
+          const clean = j.data.filter(f => !f.type || f.type === 'FOX');
+          set({ foxData: clean });
+          try { localStorage.setItem('ptf_v6_fox2', JSON.stringify(clean)); } catch {}
           return;
         }
       } catch {}
     }
-    // fallback localStorage already loaded on init
+    // Already loaded from localStorage on init
   },
 
   // ── Price Alerts ─────────────────────────────────────────
