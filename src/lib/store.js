@@ -183,19 +183,19 @@ const useStore = create((set, get) => ({
     set({ foxData: clean });
     try { localStorage.setItem('ptf_v6_fox2', JSON.stringify(clean)); } catch {}
     // Sync to Google Sheets (FOX sheet)
-    const { SCRIPT_URL, USE_CLOUD } = await import('../config.js');
+    const { SHEETS_URL, USE_CLOUD } = await import('../config.js');
     if (USE_CLOUD) {
       try {
-        await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({ action:'saveFox', data: clean }) });
+        await fetch(SHEETS_URL, { method:'POST', body: JSON.stringify({ action:'saveFox', data: clean }) });
       } catch {}
     }
   },
 
   loadFoxData: async () => {
-    const { SCRIPT_URL, USE_CLOUD } = await import('../config.js');
+    const { SHEETS_URL, USE_CLOUD } = await import('../config.js');
     if (USE_CLOUD) {
       try {
-        const r = await fetch(`${SCRIPT_URL}?action=getFox`);
+        const r = await fetch(`${SHEETS_URL}?action=getFox`);
         const j = await r.json();
         if (j.ok && Array.isArray(j.data)) {
           const clean = j.data.filter(f => !f.type || f.type === 'FOX');
