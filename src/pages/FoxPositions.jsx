@@ -382,7 +382,7 @@ export default function FoxPositions() {
 
       {/* Summary cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>
-        {view==='open'?[
+        {(view==='open'?[
           {label:'Cost Total',   val:fmtC(totalOpenCost),   accent:'var(--text3)', v:null},
           {label:'Valoare',      val:fmtC(totalOpenVal),    accent:'var(--blue)',  v:null},
           {label:'Profit',       val:fmtC(totalOpenProfit), accent:totalOpenProfit>=0?'var(--green)':'var(--red)',  v:totalOpenProfit},
@@ -392,7 +392,7 @@ export default function FoxPositions() {
           {label:'Profit Realizat',val:fmtC(totalClosedProfit), accent:totalClosedProfit>=0?'var(--green)':'var(--red)', v:totalClosedProfit},
           {label:'ROI Mediu',      val:fmtPct(totalClosedRoi),  accent:totalClosedRoi>=0?'var(--green)':'var(--red)',   v:totalClosedRoi},
           {label:'Poziții',        val:closedFox.length,         accent:'var(--purple)', v:null},
-        ].map(c=>(
+        ]).map(c=>(
           <div key={c.label} className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${c.accent}`}}>
             <div className="label" style={{marginBottom:6}}>{c.label}</div>
             <div className={`mono ${c.v!=null?pnlClass(c.v):''}`} style={{fontSize:16,fontWeight:700}}>{c.val}</div>
