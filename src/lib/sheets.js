@@ -24,6 +24,8 @@ export async function loadTransactions() {
         id:     Number(row.id) || row.id,
         shares: Number(row.shares),
         price:  Number(row.price),
+        sym:    row.symbol || row.sym || '',
+        symbol: row.symbol || row.sym || '',
       }));
     } catch (e) { console.warn('Cloud load failed:', e.message); }
   }
