@@ -1,103 +1,95 @@
 import { useMemo, useState } from 'react'
 import useStore from '../lib/store.js'
 import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
+import { calcPortfolio } from '../lib/portfolio.js'
 
 const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
-
-
-
 const CLUB_COLORS = ['#4d9fff','#00d4aa','#a78bfa','#f0b429','#ff4d6a','#34d399','#fb923c','#60a5fa','#f472b6','#a3e635']
 
-function PieChart({ stats }) {
-  if (!stats.length) return null
-  const total = stats.reduce((s,i)=>s+i.invested,0)
-  if (!total) return null
-  const size = 120, cx = size/2, cy = size/2, r = 48, innerR = 28
-  let angle = -Math.PI/2
-  const slices = stats.map(inv => {
-    const pct = inv.invested/total
-    const a = pct*2*Math.PI
-    const x1 = cx+r*Math.cos(angle), y1 = cy+r*Math.sin(angle)
-    const x2 = cx+r*Math.cos(angle+a), y2 = cy+r*Math.sin(angle+a)
-    const xi1 = cx+innerR*Math.cos(angle), yi1 = cy+innerR*Math.sin(angle)
-    const xi2 = cx+innerR*Math.cos(angle+a), yi2 = cy+innerR*Math.sin(angle+a)
-    const large = a>Math.PI?1:0
-    const path = `M${xi1},${yi1} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${xi2},${yi2} A${innerR},${innerR},0,${large},0,${xi1},${yi1} Z`
-    angle += a
-    return { path, color: inv.color, name: inv.name, pct: pct*100 }
-  })
+// Business person icon
+function BusinessIcon({ color, size=32 }) {
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {slices.map((s,i)=><path key={i} d={s.path} fill={s.color} opacity={.9}/>)}
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+      <circle cx="16" cy="10" r="5" fill={color} opacity=".9"/>
+      <rect x="8" y="17" width="16" height="2" rx="1" fill={color} opacity=".6"/>
+      <rect x="6" y="19" width="20" height="9" rx="3" fill={color} opacity=".85"/>
+      <rect x="13" y="15" width="6" height="4" rx="1" fill={color} opacity=".5"/>
     </svg>
   )
 }
 
-export default function Club() {
-  const { club, updateClub, isAdmin, getPortfolio, marketData } = useStore()
-  const { positions, cashByBroker } = useMemo(getPortfolio, [getPortfolio])
+function fmtRON(n) {
+  if (n == null || isNaN(n)) return '—'
+  return new Intl.NumberFormat('ro-RO', { style:'currency', currency:'RON', minimumFractionDigits:0, maximumFractionDigits:0 }).format(n)
+}
 
-  const [showInvModal, setShowInvModal] = useState(false)
+export default function Club() {
+  const { club, updateClub, isAdmin, txs, prices, marketData } = useStore()
+  const { positions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
+
+  const [showInvModal,     setShowInvModal]     = useState(false)
   const [showContribModal, setShowContribModal] = useState(false)
-  const [editInv, setEditInv] = useState(null)
+  const [editInv,   setEditInv]   = useState(null)
   const [editContrib, setEditContrib] = useState(null)
-  const [invForm, setInvForm] = useState({name:'',color:CLUB_COLORS[0]})
-  const [contribForm, setContribForm] = useState({investorId:'',month:new Date().toISOString().slice(0,7),amount:''})
+  const [invForm,    setInvForm]    = useState({name:'', color:CLUB_COLORS[0]})
+  const [contribForm, setContribForm] = useState({investorId:'', month:new Date().toISOString().slice(0,7), amount:''})
   const [clubValOverride, setClubValOverride] = useState('')
 
-  // Auto value: portfolio USD * USD/RON
   const usdRon = marketData['RON=X']?.price
   const totalPortfolio = positions.reduce((s,p)=>s+(p.curValue||0),0) + Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const autoValueRON = usdRon ? totalPortfolio * usdRon : null
   const displayValue = club.totalValue > 0 ? club.totalValue : (autoValueRON || 0)
 
   const stats = useMemo(() => {
-    const total = club.investors.reduce((s,inv)=>{
-      return s + club.contributions.filter(c=>c.investorId===inv.id).reduce((ss,c)=>ss+c.amount,0)
-    },0)
-    return club.investors.map(inv=>{
+    const total = club.investors.reduce((s,inv) =>
+      s + club.contributions.filter(c=>c.investorId===inv.id).reduce((ss,c)=>ss+c.amount,0), 0)
+    return club.investors.map(inv => {
       const contribs = club.contributions.filter(c=>c.investorId===inv.id)
       const invested = contribs.reduce((s,c)=>s+c.amount,0)
-      const stake = total>0?(invested/total)*100:0
-      const curVal = displayValue>0?(stake/100)*displayValue:invested
-      const profit = curVal-invested
-      const roi = invested>0?(profit/invested)*100:0
-      return {...inv,invested,stake,curVal,profit,roi,contribs}
-    }).sort((a,b)=>b.invested-a.invested)
-  },[club,displayValue])
+      const stake    = total > 0 ? (invested/total)*100 : 0
+      const curVal   = displayValue > 0 ? (stake/100)*displayValue : invested
+      const profit   = curVal - invested
+      const roi      = invested > 0 ? (profit/invested)*100 : 0
+      return {...inv, invested, stake, curVal, profit, roi, contribs}
+    }).sort((a,b) => b.invested - a.invested)
+  }, [club, displayValue])
 
-  const totalInvested = stats.reduce((s,i)=>s+i.invested,0)
-  const months = useMemo(()=>[...new Set(club.contributions.map(c=>c.month))].sort().reverse(),[club.contributions])
+  const totalInvested = stats.reduce((s,i)=>s+i.invested, 0)
+  const months = useMemo(() => [...new Set(club.contributions.map(c=>c.month))].sort().reverse(), [club.contributions])
 
   const saveInv = () => {
     if (!invForm.name.trim()) return
-    const inv = {id:editInv?.id||Date.now(),name:invForm.name.trim(),color:invForm.color}
+    const inv = {id: editInv?.id||Date.now(), name:invForm.name.trim(), color:invForm.color}
     const investors = editInv
       ? club.investors.map(i=>i.id===editInv.id?inv:i)
-      : [...club.investors,inv]
-    updateClub({...club,investors})
-    setShowInvModal(false); setEditInv(null); setInvForm({name:'',color:CLUB_COLORS[investors.length%CLUB_COLORS.length]})
+      : [...club.investors, inv]
+    updateClub({...club, investors})
+    setShowInvModal(false); setEditInv(null)
+    setInvForm({name:'', color:CLUB_COLORS[investors.length%CLUB_COLORS.length]})
   }
 
-  const delInv = id => {
+  const delInv = (id) => {
     if (!confirm('Ștergi investitorul și toate contribuțiile lui?')) return
-    updateClub({...club,investors:club.investors.filter(i=>i.id!==id),contributions:club.contributions.filter(c=>c.investorId!==id)})
+    updateClub({...club,
+      investors: club.investors.filter(i=>i.id!==id),
+      contributions: club.contributions.filter(c=>c.investorId!==id)
+    })
   }
 
   const saveContrib = () => {
     if (!contribForm.investorId||!contribForm.amount||isNaN(+contribForm.amount)) return
-    const c = {id:editContrib?.id||Date.now(),investorId:+contribForm.investorId,month:contribForm.month,amount:+contribForm.amount}
+    const c = {id:editContrib?.id||Date.now(), investorId:+contribForm.investorId, month:contribForm.month, amount:+contribForm.amount}
     const contributions = editContrib
       ? club.contributions.map(x=>x.id===editContrib.id?c:x)
-      : [...club.contributions,c]
-    updateClub({...club,contributions})
-    setShowContribModal(false); setEditContrib(null); setContribForm(f=>({...f,amount:''}))
+      : [...club.contributions, c]
+    updateClub({...club, contributions})
+    setShowContribModal(false); setEditContrib(null)
   }
 
   const openContrib = (inv, month, existing) => {
     setEditContrib(existing||null)
-    setContribForm({investorId:String(inv.id),month:month||new Date().toISOString().slice(0,7),amount:existing?String(existing.amount):''})
+    setContribForm({investorId:String(inv.id), month:month||new Date().toISOString().slice(0,7), amount:existing?String(existing.amount):''})
     setShowContribModal(true)
   }
 
@@ -111,25 +103,23 @@ export default function Club() {
         </div>
         {isAdmin&&<div style={{display:'flex',gap:8}}>
           <button className="btn btn-ghost btn-sm" onClick={()=>{setEditInv(null);setInvForm({name:'',color:CLUB_COLORS[club.investors.length%CLUB_COLORS.length]});setShowInvModal(true)}}>+ Investitor</button>
-          <button className="btn btn-ghost btn-sm" onClick={()=>{setEditContrib(null);setContribForm({investorId:club.investors[0]?.id||'',month:new Date().toISOString().slice(0,7),amount:''});setShowContribModal(true)}}>+ Contribuție</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{setEditContrib(null);setContribForm({investorId:String(club.investors[0]?.id||''),month:new Date().toISOString().slice(0,7),amount:''});setShowContribModal(true)}}>+ Contribuție</button>
         </div>}
       </div>
 
-      {/* Value banner */}
+      {/* Value banner - full width */}
       <div className="card" style={{padding:'18px 20px',marginBottom:20,background:'linear-gradient(135deg,rgba(77,159,255,0.08),rgba(167,139,250,0.08))',borderColor:'var(--blue-b)'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:12}}>
           <div>
             <div className="label" style={{marginBottom:6,color:'var(--blue)'}}>Valoare Actuală Club (RON)</div>
-            <div className="mono" style={{fontSize:26,fontWeight:700,color:'var(--blue)'}}>
-              {fmtC(displayValue,'RON')}
-            </div>
+            <div className="mono" style={{fontSize:26,fontWeight:700,color:'var(--blue)'}}>{fmtRON(displayValue)}</div>
             {displayValue>0&&totalInvested>0&&<div className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontSize:13,marginTop:4}}>
-              {fmtC(displayValue-totalInvested,'RON')} · {fmtPct((displayValue-totalInvested)/totalInvested*100)}
+              {fmtRON(displayValue-totalInvested)} · {fmtPct((displayValue-totalInvested)/totalInvested*100)}
             </div>}
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
             {autoValueRON&&<div style={{fontSize:11,color:'var(--blue)',fontFamily:'var(--mono)',background:'var(--blue-bg)',padding:'4px 10px',borderRadius:5,border:'1px solid var(--blue-b)'}}>
-              auto: {totalPortfolio.toFixed(0)} USD × {usdRon?.toFixed(4)} = {autoValueRON.toFixed(0)} RON
+              auto: {Math.round(totalPortfolio)} USD × {usdRon?.toFixed(2)} = {Math.round(autoValueRON)} RON
             </div>}
             {isAdmin&&<div style={{display:'flex',gap:8,alignItems:'center'}}>
               <input className="input mono" type="number" placeholder="Override RON..." value={clubValOverride}
@@ -150,73 +140,57 @@ export default function Club() {
         </div>
       )}
 
+      {/* Investor stats table - full width, no pie */}
       {club.investors.length>0&&(
-        <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:16,marginBottom:20,alignItems:'start'}}>
-          {/* Pie chart */}
-          <div className="card" style={{padding:16,display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
-            <PieChart stats={stats}/>
-            <div style={{display:'flex',flexDirection:'column',gap:6,width:'100%'}}>
-              {stats.map(inv=>(
-                <div key={inv.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:11}}>
-                  <span style={{width:8,height:8,borderRadius:'50%',background:inv.color,flexShrink:0}}/>
-                  <span style={{flex:1,color:'var(--text2)'}}>{inv.name}</span>
-                  <span className="mono" style={{color:'var(--text3)'}}>{inv.stake.toFixed(1)}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Investor stats table */}
-          <div className="card" style={{overflow:'hidden'}}>
-            <div style={{overflowX:'auto'}}>
-              <table className="data-table" style={{minWidth:500}}>
-                <thead><tr>
-                  <th style={STICKY_H}>Investitor</th>
-                  <th style={{textAlign:'right'}}>Investit</th>
-                  <th style={{textAlign:'right'}}>Stake %</th>
-                  <th style={{textAlign:'right'}}>Val. Actuală</th>
-                  <th style={{textAlign:'right'}}>Profit</th>
-                  <th style={{textAlign:'right'}}>ROI</th>
-                  {isAdmin&&<th/>}
-                </tr></thead>
-                <tbody>
-                  {stats.map(inv=>(
-                    <tr key={inv.id}>
-                      <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{width:10,height:10,borderRadius:'50%',background:inv.color,flexShrink:0}}/>
-                          <span style={{fontWeight:600}}>{inv.name}</span>
-                        </div>
-                      </td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12}}>{fmtC(inv.invested,'RON')}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12}}>{inv.stake.toFixed(1)}%</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12,color:'var(--blue)',fontWeight:600}}>{fmtC(inv.curVal,'RON')}</td>
-                      <td style={{textAlign:'right'}}>
-                        <span className={`mono ${pnlClass(inv.profit)}`} style={{fontSize:12,fontWeight:600}}>{fmtC(inv.profit,'RON')}</span>
-                      </td>
-                      <td style={{textAlign:'right'}}>
-                        <span className={`mono ${pnlClass(inv.roi)}`} style={{fontSize:12,fontWeight:600}}>{fmtPct(inv.roi)}</span>
-                      </td>
-                      {isAdmin&&<td>
-                        <div style={{display:'flex',gap:4}}>
-                          <button className="btn btn-ghost btn-sm" onClick={()=>{setEditInv(inv);setInvForm({name:inv.name,color:inv.color});setShowInvModal(true)}}>✏</button>
-                          <button className="btn btn-danger btn-sm" onClick={()=>delInv(inv.id)}>✕</button>
-                        </div>
-                      </td>}
-                    </tr>
-                  ))}
-                  <tr className="total-row">
-                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>TOTAL</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmtC(totalInvested,'RON')}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>100%</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--blue)'}}>{fmtC(displayValue,'RON')}</td>
-                    <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontWeight:700}}>{fmtC(displayValue-totalInvested,'RON')}</span></td>
-                    <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontWeight:700}}>{totalInvested>0?fmtPct((displayValue-totalInvested)/totalInvested*100):'—'}</span></td>
-                    {isAdmin&&<td/>}
+        <div className="card" style={{overflow:'hidden',marginBottom:16}}>
+          <div style={{overflowX:'auto'}}>
+            <table className="data-table" style={{minWidth:500}}>
+              <thead><tr>
+                <th style={STICKY_H}>Investitor</th>
+                <th style={{textAlign:'right'}}>Investit</th>
+                <th style={{textAlign:'right'}}>Stake %</th>
+                <th style={{textAlign:'right'}}>Val. Actuală</th>
+                <th style={{textAlign:'right'}}>Profit</th>
+                <th style={{textAlign:'right'}}>ROI</th>
+                {isAdmin&&<th/>}
+              </tr></thead>
+              <tbody>
+                {stats.map(inv=>(
+                  <tr key={inv.id}>
+                    <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:10}}>
+                        <BusinessIcon color={inv.color} size={28}/>
+                        <span style={{fontWeight:600}}>{inv.name}</span>
+                      </div>
+                    </td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12}}>{fmtRON(inv.invested)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12}}>{inv.stake.toFixed(1)}%</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12,color:'var(--blue)',fontWeight:600}}>{fmtRON(inv.curVal)}</td>
+                    <td style={{textAlign:'right'}}>
+                      <span className={`mono ${pnlClass(inv.profit)}`} style={{fontSize:12,fontWeight:600}}>{fmtRON(inv.profit)}</span>
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <span className={`mono ${pnlClass(inv.roi)}`} style={{fontSize:12,fontWeight:600}}>{fmtPct(inv.roi)}</span>
+                    </td>
+                    {isAdmin&&<td>
+                      <div style={{display:'flex',gap:4}}>
+                        <button className="btn btn-ghost btn-sm" onClick={()=>{setEditInv(inv);setInvForm({name:inv.name,color:inv.color});setShowInvModal(true)}}>✏</button>
+                        <button className="btn btn-danger btn-sm" onClick={()=>delInv(inv.id)}>✕</button>
+                      </div>
+                    </td>}
                   </tr>
-                </tbody>
-              </table>
-            </div>
+                ))}
+                <tr className="total-row">
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>TOTAL</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmtRON(totalInvested)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>100%</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--blue)'}}>{fmtRON(displayValue)}</td>
+                  <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontWeight:700}}>{fmtRON(displayValue-totalInvested)}</span></td>
+                  <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontWeight:700}}>{totalInvested>0?fmtPct((displayValue-totalInvested)/totalInvested*100):'—'}</span></td>
+                  {isAdmin&&<td/>}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -224,7 +198,7 @@ export default function Club() {
       {/* Contributions table */}
       {months.length>0&&(
         <div className="card" style={{overflow:'hidden'}}>
-          <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)'}}>
             <div className="label">Contribuții Lunare</div>
           </div>
           <div style={{overflowX:'auto'}}>
@@ -245,12 +219,12 @@ export default function Club() {
                         const c = club.contributions.find(x=>x.investorId===inv.id&&x.month===month)
                         return (
                           <td key={inv.id} style={{textAlign:'right'}}>
-                            {c ? <span style={{fontFamily:'var(--mono)',fontSize:12,color:inv.color,fontWeight:600}}>{fmtC(c.amount,'RON')}</span>
+                            {c ? <span style={{fontFamily:'var(--mono)',fontSize:12,color:inv.color,fontWeight:600}}>{fmtRON(c.amount)}</span>
                               : <span style={{color:'var(--text3)'}}>—</span>}
                           </td>
                         )
                       })}
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12,fontWeight:700}}>{fmtC(monthTotal,'RON')}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:12,fontWeight:700}}>{fmtRON(monthTotal)}</td>
                       {isAdmin&&<td>
                         <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                           {stats.map(inv=>{
@@ -261,7 +235,7 @@ export default function Club() {
                               </button>
                             ):null
                           })}
-                          <button className="btn btn-ghost btn-sm" style={{fontSize:9,padding:'2px 5px'}} onClick={()=>{setEditContrib(null);setContribForm({investorId:stats[0]?.id||'',month,amount:''});setShowContribModal(true)}}>+ Add</button>
+                          <button className="btn btn-ghost btn-sm" style={{fontSize:9,padding:'2px 5px'}} onClick={()=>{setEditContrib(null);setContribForm({investorId:String(stats[0]?.id||''),month,amount:''});setShowContribModal(true)}}>+ Add</button>
                         </div>
                       </td>}
                     </tr>
@@ -273,7 +247,7 @@ export default function Club() {
         </div>
       )}
 
-      {/* Add/Edit Investor Modal */}
+      {/* Investor Modal */}
       {showInvModal&&isAdmin&&(
         <div className="overlay" onClick={()=>setShowInvModal(false)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:360}}>
@@ -303,7 +277,7 @@ export default function Club() {
         </div>
       )}
 
-      {/* Add/Edit Contribution Modal */}
+      {/* Contribution Modal */}
       {showContribModal&&isAdmin&&(
         <div className="overlay" onClick={()=>setShowContribModal(false)}>
           <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:360}}>
@@ -321,7 +295,7 @@ export default function Club() {
               </div>
               <div>
                 <div className="label" style={{marginBottom:5}}>Sumă (RON)</div>
-                <input className="input mono" type="number" placeholder="500" min="0" step="any" value={contribForm.amount} onChange={e=>setContribForm(f=>({...f,amount:e.target.value}))}/>
+                <input className="input mono" type="number" placeholder="500" min="0" step="1" value={contribForm.amount} onChange={e=>setContribForm(f=>({...f,amount:e.target.value}))}/>
               </div>
             </div>
             <div className="modal-footer">
