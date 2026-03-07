@@ -190,3 +190,6 @@ select.select option { background: var(--bg2); color: var(--text); }
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 768px) { .hide-mobile { display: none !important; } .modal { padding: 18px; } }
 @media (max-width: 480px) { .hide-sm { display: none !important; } }
+
+:root { --cat-filter: none; }
+[data-theme="dark"] { --cat-filter: invert(1); }
