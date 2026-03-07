@@ -91,6 +91,111 @@ function StatCard({label,value,sub,subClass,accent,delay=0}) {
   )
 }
 
+// ── Sector Pie Chart ──────────────────────────────────────────
+const SECTOR_COLORS = {
+  'Tech':'#58a6ff','Finance':'#00d4aa','Health':'#a78bfa','Energy':'#f0b429',
+  'Consumer':'#ff5572','Industrial':'#34d399','Materials':'#fb923c',
+  'Utilities':'#60a5fa','Real Estate':'#f472b6','Telecom':'#a3e635','Other':'#6b7280','—':'#374151'
+}
+const S_ICON = {'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍','Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','Other':'·','—':'·'}
+
+function SectorPieChart({ positions, companyInfo }) {
+  const [hovered, setHovered] = useState(null)
+
+  const sectorData = useMemo(() => {
+    const map = {}
+    positions.forEach(p => {
+      const info   = companyInfo[p.symbol] || {}
+      const sector = info.sector || p.sector || '—'
+      const val    = p.curValue || 0
+      if (!map[sector]) map[sector] = { sector, value: 0, symbols: [] }
+      map[sector].value    += val
+      map[sector].symbols.push(p.symbol)
+    })
+    const total = Object.values(map).reduce((s, v) => s + v.value, 0)
+    return Object.values(map)
+      .filter(d => d.value > 0)
+      .map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }))
+      .sort((a, b) => b.value - a.value)
+  }, [positions, companyInfo])
+
+  if (!sectorData.length) return (
+    <div style={{padding:'30px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
+      Informații sector nu sunt disponibile încă. Adaugă tranzacții și așteaptă încărcarea datelor.
+    </div>
+  )
+
+  const total = sectorData.reduce((s, d) => s + d.value, 0)
+  const size = 180, cx = size/2, cy = size/2, r = 72, innerR = 38
+  let angle = -Math.PI / 2
+
+  const slices = sectorData.map(d => {
+    const pct  = d.value / total
+    const a    = pct * 2 * Math.PI
+    const x1   = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle)
+    const x2   = cx + r * Math.cos(angle + a), y2 = cy + r * Math.sin(angle + a)
+    const xi1  = cx + innerR * Math.cos(angle), yi1 = cy + innerR * Math.sin(angle)
+    const xi2  = cx + innerR * Math.cos(angle + a), yi2 = cy + innerR * Math.sin(angle + a)
+    const large = a > Math.PI ? 1 : 0
+    const path  = `M${xi1},${yi1} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${xi2},${yi2} A${innerR},${innerR},0,${large},0,${xi1},${yi1} Z`
+    const midAngle = angle + a / 2
+    const lx = cx + (r + 10) * Math.cos(midAngle)
+    const ly = cy + (r + 10) * Math.sin(midAngle)
+    angle += a
+    return { ...d, path, color: SECTOR_COLORS[d.sector] || '#6b7280', lx, ly, pct: pct * 100 }
+  })
+
+  const hov = hovered ? slices.find(s => s.sector === hovered) : null
+
+  return (
+    <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:24,alignItems:'center'}}>
+      <div style={{position:'relative',flexShrink:0}}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {slices.map((s, i) => (
+            <path key={i} d={s.path}
+              fill={s.color}
+              opacity={hovered && hovered !== s.sector ? 0.4 : 0.92}
+              style={{cursor:'pointer',transition:'opacity .2s'}}
+              onMouseEnter={() => setHovered(s.sector)}
+              onMouseLeave={() => setHovered(null)}
+            />
+          ))}
+          {/* Center label */}
+          <text x={cx} y={cy - 8} textAnchor="middle" fill="var(--text)" fontSize="13" fontWeight="700" fontFamily="var(--mono)">
+            {hov ? `${hov.pct.toFixed(1)}%` : `${sectorData.length}`}
+          </text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fill="var(--text3)" fontSize="10" fontFamily="var(--mono)">
+            {hov ? hov.sector : 'sectoare'}
+          </text>
+          <text x={cx} y={cy + 24} textAnchor="middle" fill="var(--text3)" fontSize="10" fontFamily="var(--mono)">
+            {hov ? fmtC(hov.value) : ''}
+          </text>
+        </svg>
+      </div>
+      {/* Legend */}
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {slices.map((s, i) => (
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',
+            opacity: hovered && hovered !== s.sector ? 0.4 : 1, transition:'opacity .2s'}}
+            onMouseEnter={() => setHovered(s.sector)}
+            onMouseLeave={() => setHovered(null)}>
+            <span style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/>
+            <span style={{fontSize:11,color:'var(--text2)',flex:1,fontWeight:500}}>
+              {S_ICON[s.sector]||''} {s.sector}
+            </span>
+            <span className="mono" style={{fontSize:10,color:'var(--text3)',minWidth:36,textAlign:'right'}}>
+              {s.pct.toFixed(1)}%
+            </span>
+            <span className="mono" style={{fontSize:10,color:'var(--text3)',minWidth:70,textAlign:'right'}}>
+              {fmtC(s.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Alloc Chart ───────────────────────────────────────────────
 function AllocChart({positions}) {
   const total=positions.reduce((s,p)=>s+(p.curValue||0),0)
@@ -233,6 +338,7 @@ function SkeletonCard() {
 export default function Dashboard() {
   const txs=useStore(s=>s.txs)
   const prices=useStore(s=>s.prices)
+  const companyInfo=useStore(s=>s.companyInfo)
   const cloudLoading=useStore(s=>s.cloudLoading)
   const pricesLoading=useStore(s=>s.pricesLoading)
   const hasCachedData=Object.keys(prices).length>0||txs.length>0
@@ -249,6 +355,7 @@ export default function Dashboard() {
     {id:'perf',label:'📈 Performanță'},
     {id:'alloc',label:'▦ Alocare'},
     {id:'monthly',label:'📊 Lunar'},
+    {id:'sectors',label:'🥧 Sectoare'},
   ]
 
   return(
@@ -285,6 +392,7 @@ export default function Dashboard() {
           {chartTab==='perf'    && <PerformanceChart txs={txs} prices={prices}/>}
           {chartTab==='alloc'   && <AllocChart positions={positions}/>}
           {chartTab==='monthly' && <MonthlyChart txs={txs} prices={prices}/>}
+          {chartTab==='sectors' && <SectorPieChart positions={positions} companyInfo={companyInfo}/>}
         </div>
       )}
 
