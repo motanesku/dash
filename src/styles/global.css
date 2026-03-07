@@ -191,5 +191,6 @@ select.select option { background: var(--bg2); color: var(--text); }
 @media (max-width: 768px) { .hide-mobile { display: none !important; } .modal { padding: 18px; } }
 @media (max-width: 480px) { .hide-sm { display: none !important; } }
 
-:root { --cat-filter: none; }
-[data-theme="dark"] { --cat-filter: invert(1); }
+/* Motanescu cat image - invert in dark mode (lines are dark on transparent) */
+:root { --cat-filter: invert(1) opacity(0.7); }
+[data-theme="light"] { --cat-filter: none; opacity: 0.75; }
