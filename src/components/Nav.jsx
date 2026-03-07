@@ -4,7 +4,7 @@ const TABS = [
   { id:'dashboard',    icon:'◈', label:'Dashboard' },
   { id:'positions',    icon:'▦', label:'Poziții' },
   { id:'fox',          icon:'🦊', label:'FOX' },
-  { id:'club',         icon:'◉', label:'Club' },
+  { id:'club',         icon:'👔🤵', label:'Club' },
   { id:'transactions', icon:'≡', label:'Tranzacții' },
 ]
 
