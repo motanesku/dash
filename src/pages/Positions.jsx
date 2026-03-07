@@ -3,12 +3,40 @@ import useStore from '../lib/store.js'
 import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
 
-
+const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
+const CAP_COLORS    = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
 const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
-const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
-const CAP_COLORS = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
+// Aggregate positions with same symbol across brokers
+function aggregateBySymbol(positions) {
+  const map = {}
+  positions.forEach(p => {
+    if (!map[p.symbol]) {
+      map[p.symbol] = { ...p, brokers: [p.broker] }
+    } else {
+      const e = map[p.symbol]
+      const newShares   = e.shares + p.shares
+      const newCost     = e.costBasis + p.costBasis
+      const newCurValue = (e.curValue||0) + (p.curValue||0)
+      const newUnr      = (e.unrealizedPnl||0) + (p.unrealizedPnl||0)
+      const newReal     = e.realizedPnl + p.realizedPnl
+      map[p.symbol] = {
+        ...e,
+        shares:        newShares,
+        costBasis:     newCost,
+        curValue:      newCurValue,
+        unrealizedPnl: newUnr,
+        unrealizedPct: newCost > 0 ? (newUnr / newCost) * 100 : null,
+        realizedPnl:   newReal,
+        avgPrice:      newShares > 0 ? newCost / newShares : 0,
+        dayChange:     p.dayChange, // use latest
+        brokers:       [...e.brokers, p.broker],
+      }
+    }
+  })
+  return Object.values(map).sort((a,b) => (b.curValue||0) - (a.curValue||0))
+}
 
 export default function Positions({ onEditTx }) {
   const txs          = useStore(s => s.txs)
@@ -22,7 +50,7 @@ export default function Positions({ onEditTx }) {
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
   const [sortBy, setSortBy]           = useState('value')
-  const [view, setView]               = useState('open') // 'open' | 'closed'
+  const [view, setView]               = useState('open')
 
   // Per-broker stats
   const brokerStats = useMemo(() => {
@@ -32,11 +60,10 @@ export default function Positions({ onEditTx }) {
       const bVal  = bPos.reduce((s,p) => s + (p.curValue||0), 0)
       const bCost = bPos.reduce((s,p) => s + p.costBasis, 0)
       const bUnr  = bPos.reduce((s,p) => s + (p.unrealizedPnl||0), 0)
-      const bReal = bPos.reduce((s,p) => s + p.realizedPnl, 0)
-      const bCash = cashByBroker[b] || 0
       stats[b] = {
-        val: bVal, cost: bCost, unrealized: bUnr, realized: bReal,
-        cash: bCash, roi: bCost > 0 ? (bUnr / bCost) * 100 : null,
+        val: bVal, cost: bCost, unrealized: bUnr,
+        cash: cashByBroker[b] || 0,
+        roi: bCost > 0 ? (bUnr / bCost) * 100 : null,
         count: bPos.length,
       }
     })
@@ -45,9 +72,11 @@ export default function Positions({ onEditTx }) {
 
   const totalCash = Object.values(cashByBroker).reduce((s,v) => s+v, 0)
 
+  // Filter by broker then aggregate same symbols
   const filteredOpen = useMemo(() => {
     const arr = brokerTab ? positions.filter(p => p.broker === brokerTab) : positions
-    return [...arr].sort((a,b) => {
+    const agg = brokerTab ? arr : aggregateBySymbol(arr)
+    return [...agg].sort((a,b) => {
       if (sortBy==='value')      return (b.curValue||0) - (a.curValue||0)
       if (sortBy==='unrealized') return (b.unrealizedPct||0) - (a.unrealizedPct||0)
       if (sortBy==='daychange')  return (b.dayChange||0) - (a.dayChange||0)
@@ -60,10 +89,9 @@ export default function Positions({ onEditTx }) {
     return [...arr].sort((a,b) => b.totalProfit - a.totalProfit)
   }, [closedPositions, brokerTab])
 
-  const totalVal       = filteredOpen.reduce((s,p) => s + (p.curValue||0), 0)
-  const totalCost      = filteredOpen.reduce((s,p) => s + p.costBasis, 0)
+  const totalVal        = filteredOpen.reduce((s,p) => s + (p.curValue||0), 0)
+  const totalCost       = filteredOpen.reduce((s,p) => s + p.costBasis, 0)
   const totalUnrealized = filteredOpen.reduce((s,p) => s + (p.unrealizedPnl||0), 0)
-  const totalRealized  = filteredOpen.reduce((s,p) => s + p.realizedPnl, 0)
 
   const SortBtn = ({val,label}) => (
     <button onClick={()=>setSortBy(val)} style={{
@@ -116,7 +144,7 @@ export default function Positions({ onEditTx }) {
           background:!brokerTab?'var(--blue-bg)':'var(--surface)',
           color:!brokerTab?'var(--blue)':'var(--text3)',
           fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
-        }}>TOTAL · {positions.length} poz.</button>
+        }}>TOTAL · {[...new Set(positions.map(p=>p.symbol))].length} simboluri</button>
         {brokers.map((b,i) => {
           const st = brokerStats[b]
           const active = brokerTab === b
@@ -140,10 +168,10 @@ export default function Positions({ onEditTx }) {
         })}
       </div>
 
-      {/* Open / Closed toggle */}
+      {/* Open / Closed toggle + sort */}
       <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
         {[
-          {id:'open',   label:`▶ Deschise (${filteredOpen.length})`},
+          {id:'open',   label:`▶ Deschise (${brokerTab ? filteredOpen.length : [...new Set(positions.map(p=>p.symbol))].length})`},
           {id:'closed', label:`✓ Închise (${filteredClosed.length})`},
         ].map(t => (
           <button key={t.id} onClick={()=>setView(t.id)} style={{
@@ -166,28 +194,32 @@ export default function Positions({ onEditTx }) {
       {view === 'open' && (
         <div className="card" style={{overflow:'hidden',marginBottom:16}}>
           <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-            <table className="data-table" style={{minWidth:700}}>
+            <table className="data-table" style={{minWidth:620}}>
               <thead><tr>
-                <th style={STICKY_H}>Symbol / Domeniu</th>
+                <th style={STICKY_H}>Symbol</th>
                 <th>Acțiuni · Avg</th>
                 <th>Preț · Δ azi</th>
                 <th style={{textAlign:'right'}}>Nerealizat · %</th>
-                <th style={{textAlign:'right'}} className="hide-mobile">Realizat</th>
                 <th style={{textAlign:'right'}}>Valoare</th>
               </tr></thead>
               <tbody>
                 {filteredOpen.map(p => {
                   const info = companyInfo[p.symbol] || {}
+                  const brokerList = p.brokers || [p.broker]
                   return (
-                    <tr key={p.broker+p.symbol} style={{cursor:'pointer'}}
+                    <tr key={p.symbol+(p.broker||'')} style={{cursor:'pointer'}}
                       onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
                       <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                         <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
-                        <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
-                          <span>{p.name}</span>
-                          <span style={{background:'var(--surface2)',padding:'1px 5px',borderRadius:3,border:'1px solid var(--border)',fontSize:9}}>{p.broker}</span>
+                        <div style={{fontSize:10,color:'var(--text3)',marginTop:2,whiteSpace:'normal',lineHeight:1.4}}>
+                          {p.name}
+                        </div>
+                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
                           {info.domain&&<span style={{fontSize:9,color:'var(--blue)'}}>{info.domain}</span>}
                           {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                          {brokerList.map((b,i)=>(
+                            <span key={b} style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:BROKER_COLORS[brokers.indexOf(b)%BROKER_COLORS.length],border:'1px solid var(--border)'}}>{b}</span>
+                          ))}
                         </div>
                       </td>
                       <td>
@@ -202,9 +234,6 @@ export default function Positions({ onEditTx }) {
                         <div className={`mono ${pnlClass(p.unrealizedPnl)}`} style={{fontSize:12,fontWeight:600}}>{p.unrealizedPnl!=null?fmtC(p.unrealizedPnl,p.currency):'—'}</div>
                         <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
                       </td>
-                      <td style={{textAlign:'right'}} className="hide-mobile">
-                        <div className="mono" style={{fontSize:12,color:p.realizedPnl!==0?(p.realizedPnl>0?'var(--purple)':'var(--red)'):'var(--text3)'}}>{p.realizedPnl!==0?fmtC(p.realizedPnl,p.currency):'—'}</div>
-                      </td>
                       <td style={{textAlign:'right'}}>
                         <div className="mono" style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{p.curValue?fmtC(p.curValue,p.currency):'—'}</div>
                       </td>
@@ -218,9 +247,6 @@ export default function Positions({ onEditTx }) {
                   <td style={{textAlign:'right'}}>
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontWeight:700}}>{fmtC(totalUnrealized)}</div>
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontSize:10}}>{totalCost>0?fmtPct(totalUnrealized/totalCost*100):''}</div>
-                  </td>
-                  <td style={{textAlign:'right'}} className="hide-mobile">
-                    <div className="mono" style={{color:'var(--purple)',fontWeight:700}}>{fmtC(totalRealized)}</div>
                   </td>
                   <td style={{textAlign:'right'}}>
                     <div className="mono" style={{fontWeight:700,color:'var(--text)',fontSize:14}}>{fmtC(totalVal)}</div>
@@ -241,11 +267,11 @@ export default function Positions({ onEditTx }) {
             </div>
           ) : (
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <table className="data-table" style={{minWidth:600}}>
+              <table className="data-table" style={{minWidth:580}}>
                 <thead><tr>
-                  <th style={STICKY_H}>Symbol / Domeniu</th>
+                  <th style={STICKY_H}>Symbol</th>
                   <th>Broker</th>
-                  <th>Acțiuni</th>
+                  <th style={{textAlign:'right'}}>Acțiuni</th>
                   <th style={{textAlign:'right'}}>Profit Realizat</th>
                   <th style={{textAlign:'right'}}>ROI</th>
                   <th style={{textAlign:'right'}} className="hide-mobile">Ultima vânzare</th>
@@ -257,13 +283,13 @@ export default function Positions({ onEditTx }) {
                       <tr key={i}>
                         <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                           <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
-                          <div style={{fontSize:10,color:'var(--text3)',marginTop:2,display:'flex',gap:4,flexWrap:'wrap'}}>
-                            {info.domain&&<span style={{color:'var(--blue)'}}>{info.domain}</span>}
-                            {info.cap&&<span style={{padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`,fontSize:9}}>{info.cap}</span>}
+                          <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
+                            {info.domain&&<span style={{fontSize:9,color:'var(--blue)'}}>{info.domain}</span>}
+                            {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
                           </div>
                         </td>
                         <td><span style={{fontSize:11,color:'var(--text3)'}}>{p.broker}</span></td>
-                        <td><span className="mono" style={{fontSize:12}}>{p.trades.reduce((s,t)=>s+t.shares,0).toFixed(2)}</span></td>
+                        <td style={{textAlign:'right'}}><span className="mono" style={{fontSize:12}}>{p.totalShares?.toFixed(4)||'—'}</span></td>
                         <td style={{textAlign:'right'}}>
                           <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:13,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
                         </td>
@@ -294,7 +320,6 @@ export default function Positions({ onEditTx }) {
         </div>
       )}
 
-      {/* Chart for selected position */}
       {selectedPos && view==='open' && (
         <div className="card fade-up" style={{padding:'16px 18px',marginBottom:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
