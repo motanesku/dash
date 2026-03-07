@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import useStore from '../lib/store.js'
 
 export default function AddTxModal({ tx: editTx, onClose }) {
-  const { addTx, updateTx, brokers } = useStore()
+  const { addTx, updateTx, brokers, prices, companyInfo, fetchCompanyInfo } = useStore()
   const today = new Date().toISOString().split('T')[0]
   const [form, setForm] = useState({
     type:'BUY', symbol:'', shares:'', price:'', date:today,
     broker: brokers[0]||'XTB', notes:''
   })
   const [err, setErr] = useState('')
+  const [symInfo, setSymInfo] = useState(null) // {name, sector, cap, domain}
+  const debounceRef = useRef(null)
 
   useEffect(() => {
     if (editTx) setForm({
@@ -18,6 +20,48 @@ export default function AddTxModal({ tx: editTx, onClose }) {
       broker:editTx.broker, notes:editTx.notes||''
     })
   }, [editTx])
+
+  // Auto-fetch info when symbol changes
+  useEffect(() => {
+    const sym = form.symbol.toUpperCase().trim()
+    if (!sym || sym.length < 1) { setSymInfo(null); return }
+
+    // Check cache first
+    const cached = companyInfo[sym]
+    const pData  = prices[sym]
+    if (cached || pData) {
+      setSymInfo({
+        name:   pData?.name || '',
+        sector: cached?.sector || '',
+        cap:    cached?.cap    || '',
+        domain: cached?.domain || cached?.industry || '',
+      })
+    }
+
+    // Debounce fetch
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      if (!companyInfo[sym]?.sector) {
+        await fetchCompanyInfo([sym])
+      }
+    }, 800)
+  }, [form.symbol])
+
+  // Update symInfo when companyInfo changes
+  useEffect(() => {
+    const sym = form.symbol.toUpperCase().trim()
+    if (!sym) return
+    const info = companyInfo[sym]
+    const pData = prices[sym]
+    if (info || pData) {
+      setSymInfo({
+        name:   pData?.name || '',
+        sector: info?.sector || '',
+        cap:    info?.cap    || '',
+        domain: info?.domain || info?.industry || '',
+      })
+    }
+  }, [companyInfo, form.symbol])
 
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}))
 
@@ -36,10 +80,12 @@ export default function AddTxModal({ tx: editTx, onClose }) {
   }
 
   const TYPE_CONFIG = {
-    BUY:     {label:'▲ BUY',     color:'var(--green)'},
-    SELL:    {label:'▼ SELL',    color:'var(--red)'},
+    BUY:     {label:'▲ BUY',      color:'var(--green)'},
+    SELL:    {label:'▼ SELL',     color:'var(--red)'},
     DEPOSIT: {label:'💵 DEPUNERE', color:'var(--blue)'},
   }
+
+  const CAP_COLORS = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
 
   return (
     <div className="overlay" onClick={onClose}>
@@ -48,7 +94,6 @@ export default function AddTxModal({ tx: editTx, onClose }) {
           {editTx?'✏ Editează Tranzacție':TYPE_CONFIG[form.type]?.label||'Tranzacție nouă'}
         </div>
 
-        {/* Type selector */}
         <div style={{display:'flex',gap:8,marginBottom:18}}>
           {Object.entries(TYPE_CONFIG).map(([t,cfg])=>(
             <button key={t} onClick={()=>setForm(f=>({...f,type:t}))} style={{
@@ -84,7 +129,17 @@ export default function AddTxModal({ tx: editTx, onClose }) {
             <>
               <div>
                 <div className="label" style={{marginBottom:5}}>Symbol</div>
-                <input className="input" placeholder="AAPL, TLV.RO, BTC-USD..." value={form.symbol} onChange={e=>setForm(f=>({...f,symbol:e.target.value.toUpperCase()}))}/>
+                <input className="input" placeholder="AAPL, TLV.RO, BTC-USD..." value={form.symbol}
+                  onChange={e=>setForm(f=>({...f,symbol:e.target.value.toUpperCase()}))}/>
+                {/* Auto company info preview */}
+                {symInfo && (symInfo.name||symInfo.sector||symInfo.cap) && (
+                  <div style={{marginTop:6,padding:'6px 10px',background:'var(--surface2)',borderRadius:6,border:'1px solid var(--border)',display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                    {symInfo.name&&<span style={{fontSize:11,color:'var(--text3)'}}>{symInfo.name}</span>}
+                    {symInfo.domain&&<span style={{fontSize:10,color:'var(--blue)'}}>{symInfo.domain}</span>}
+                    {symInfo.cap&&<span style={{fontSize:10,padding:'1px 6px',borderRadius:3,background:'var(--surface)',color:CAP_COLORS[symInfo.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[symInfo.cap]||'var(--border)'}40`}}>{symInfo.cap}</span>}
+                    {symInfo.sector&&<span style={{fontSize:10,color:'var(--text3)'}}>{symInfo.sector}</span>}
+                  </div>
+                )}
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <div>
