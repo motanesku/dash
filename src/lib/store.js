@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { fetchPrices, fetchFearGreed, MARKET_SYMBOLS } from './prices.js';
 import { calcPortfolio } from './portfolio.js';
-import { loadTransactions, saveTransactionsLocal, addTransaction, updateTransaction, deleteTransaction, bulkAddTransactions, loadBrokers, saveBrokers, loadAlerts, saveAlerts, loadClub, saveClub } from './sheets.js';
+import { loadTransactions, saveTransactionsLocal, syncTransactionsToCloud, loadBrokers, saveBrokers, loadAlerts, saveAlerts, loadClub, saveClub } from './sheets.js';
 
 const PRICES_CACHE_KEY = 'ptf_v6_prices';
 const MARKET_CACHE_KEY = 'ptf_v6_market';
@@ -76,23 +76,23 @@ const useStore = create((set, get) => ({
     const newTx = { ...tx, id: Date.now() };
     set(s => ({ txs: [...s.txs, newTx] }));
     saveTransactionsLocal(get().txs);
-    await addTransaction(newTx);
+    await syncTransactionsToCloud(get().txs);
   },
   updateTx: async (tx) => {
     set(s => ({ txs: s.txs.map(t => t.id === tx.id ? tx : t) }));
     saveTransactionsLocal(get().txs);
-    await updateTransaction(tx);
+    await syncTransactionsToCloud(get().txs);
   },
   deleteTx: async (id) => {
     set(s => ({ txs: s.txs.filter(t => t.id !== id) }));
     saveTransactionsLocal(get().txs);
-    await deleteTransaction(id);
+    await syncTransactionsToCloud(get().txs);
   },
   bulkAddTxs: async (txs) => {
     const newTxs = txs.map(t => ({ ...t, id: Date.now() + Math.random() }));
     set(s => ({ txs: [...s.txs, ...newTxs] }));
     saveTransactionsLocal(get().txs);
-    await bulkAddTransactions(newTxs);
+    await syncTransactionsToCloud(get().txs);
   },
 
   // ── Prices — start with cache, update in background ─────
