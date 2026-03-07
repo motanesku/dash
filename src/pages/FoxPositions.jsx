@@ -1,121 +1,119 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import useStore from '../lib/store.js'
 import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 
-
 const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
+const CAPS     = ['Large Cap','Mid Cap','Small Cap','Micro Cap']
+const SECTORS  = ['Tech','Finance','Health','Energy','Consumer','Industrial','Materials','Utilities','Real Estate','Telecom','Other']
+const S_ICON   = {'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍','Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','Other':'·'}
+const CAP_COLORS = {'Large Cap':'var(--blue)','Mid Cap':'var(--green)','Small Cap':'var(--gold)','Micro Cap':'var(--red)'}
 
-const CAPS    = ['Large Cap','Mid Cap','Small Cap','Micro Cap']
-const SECTORS = ['Tech','Finance','Health','Energy','Consumer','Industrial','Materials','Utilities','Real Estate','Telecom','Other']
-const S_ICON  = {'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍','Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','Other':'·'}
-const CAP_COLORS = { 'Large Cap':'var(--blue)','Mid Cap':'var(--green)','Small Cap':'var(--gold)','Micro Cap':'var(--red)' }
-
-// ── Modal ─────────────────────────────────────────────────
-function FoxModal({ item, prices, companyInfo, onSave, onClose }) {
-  const [form, setForm] = useState(item ? {...item} : {
-    id: Date.now(), symbol:'', name:'', sector:'', cap:'', domain:'',
-    shares:0, avgPrice:0, buyMin:'', sellMin:'', sellMax:'', notes:''
-  })
-  const [autoLoading, setAutoLoading] = useState(false)
-  const [err, setErr] = useState('')
-
+// ── Company info section (shared between modals) ──────────
+function CompanyInfoSection({ form, setForm, prices, companyInfo, fetchCompanyInfo }) {
+  const [loading, setLoading] = useState(false)
+  const debounce = useRef(null)
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}))
-  const setN = k => e => setForm(f=>({...f,[k]:+e.target.value||0}))
 
-  // Auto-fetch company info when symbol changes
-  useEffect(() => {
-    if (!form.symbol || form.symbol.length < 1) return
-    const sym = form.symbol.toUpperCase().trim()
-    // Use cached info
-    const cached = companyInfo[sym]
-    if (cached?.sector) {
-      setForm(f=>({...f,
-        sector: f.sector||cached.sector,
-        cap: f.cap||cached.cap,
-        domain: f.domain||cached.domain||cached.industry,
-        name: f.name||''
-      }))
-    }
-    // Also get name from prices
+  const applyInfo = (sym) => {
+    const info  = companyInfo[sym]
     const pData = prices[sym]
-    if (pData?.name) setForm(f=>({...f, name: f.name||pData.name}))
-  }, [form.symbol, companyInfo, prices])
-
-  const fetchInfo = async () => {
-    const sym = form.symbol.toUpperCase().trim()
-    if (!sym) return
-    setAutoLoading(true)
-    try {
-      const { fetchCompanyInfo } = await import('../lib/prices.js')
-      const info = await fetchCompanyInfo([sym])
-      if (info[sym]) {
-        const i = info[sym]
-        setForm(f=>({...f,
-          sector: i.sector||f.sector,
-          cap: i.cap||f.cap,
-          domain: i.domain||i.industry||f.domain,
-        }))
-      }
-    } catch {}
-    setAutoLoading(false)
+    setForm(f=>({
+      ...f,
+      name:   f.name   || pData?.name || '',
+      sector: f.sector || info?.sector || '',
+      cap:    f.cap    || info?.cap    || '',
+      domain: f.domain || info?.domain || info?.industry || '',
+    }))
   }
 
-  const cur = prices[form.symbol?.toUpperCase()]?.price
-  const cost = form.shares * form.avgPrice
-  const profit = cur ? (cur - form.avgPrice) * form.shares : null
-  const roi = form.avgPrice>0&&cur ? ((cur-form.avgPrice)/form.avgPrice)*100 : null
+  useEffect(() => {
+    const sym = form.symbol?.toUpperCase().trim()
+    if (!sym) return
+    applyInfo(sym)
+    clearTimeout(debounce.current)
+    debounce.current = setTimeout(async () => {
+      if (!companyInfo[sym]?.sector) {
+        setLoading(true)
+        await fetchCompanyInfo([sym])
+        setLoading(false)
+      }
+    }, 700)
+  }, [form.symbol])
+
+  useEffect(() => {
+    const sym = form.symbol?.toUpperCase().trim()
+    if (sym) applyInfo(sym)
+  }, [companyInfo])
+
+  return (
+    <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
+      <div className="label" style={{marginBottom:10,color:'var(--blue)'}}>COMPANIE</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,marginBottom:10}}>
+        <input className="input mono" placeholder="Symbol (ex: AAPL)" value={form.symbol||''}
+          onChange={e=>setForm(f=>({...f,symbol:e.target.value.toUpperCase()}))}/>
+        <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)',alignSelf:'center',minWidth:40}}>
+          {loading?'⟳ ...':''}
+        </span>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div>
+          <div className="label" style={{marginBottom:4}}>Nume</div>
+          <input className="input" placeholder="Apple Inc." value={form.name||''} onChange={set('name')}/>
+        </div>
+        <div>
+          <div className="label" style={{marginBottom:4}}>Domeniu</div>
+          <input className="input" placeholder="Cloud Computing..." value={form.domain||''} onChange={set('domain')}/>
+        </div>
+        <div>
+          <div className="label" style={{marginBottom:4}}>Sector</div>
+          <select className="select" value={form.sector||''} onChange={set('sector')}>
+            <option value="">—</option>
+            {SECTORS.map(s=><option key={s} value={s}>{S_ICON[s]} {s}</option>)}
+          </select>
+        </div>
+        <div>
+          <div className="label" style={{marginBottom:4}}>Capitalizare</div>
+          <select className="select" value={form.cap||''} onChange={set('cap')}>
+            <option value="">—</option>
+            {CAPS.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal: Poziție Deschisă ───────────────────────────────
+function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onClose }) {
+  const [form, setForm] = useState(item ? {...item} : {
+    id:Date.now(), symbol:'', name:'', sector:'', cap:'', domain:'',
+    shares:0, avgPrice:0, buyMin:'', sellMin:'', sellMax:'', notes:'',
+    status:'open',
+  })
+  const [err, setErr] = useState('')
+  const setN = k => e => setForm(f=>({...f,[k]:+e.target.value||0}))
+  const set  = k => e => setForm(f=>({...f,[k]:e.target.value}))
+
+  const cur    = prices[form.symbol?.toUpperCase()]?.price
+  const cost   = (form.shares||0) * (form.avgPrice||0)
+  const profit = cur!=null ? (cur - (form.avgPrice||0)) * (form.shares||0) : null
+  const roi    = form.avgPrice>0&&cur!=null ? ((cur-form.avgPrice)/form.avgPrice)*100 : null
 
   const submit = () => {
-    if (!form.symbol.trim()) { setErr('Symbol obligatoriu'); return }
-    if (!form.shares || form.shares<=0) { setErr('Nr. acțiuni obligatoriu'); return }
-    if (!form.avgPrice || form.avgPrice<=0) { setErr('Preț mediu obligatoriu'); return }
-    onSave({...form, symbol: form.symbol.toUpperCase().trim(), id: form.id||Date.now()})
+    if (!form.symbol?.trim())              { setErr('Symbol obligatoriu'); return }
+    if (!form.shares || form.shares<=0)    { setErr('Nr. acțiuni obligatoriu'); return }
+    if (!form.avgPrice || form.avgPrice<=0){ setErr('Preț mediu obligatoriu'); return }
+    onSave({...form, symbol:form.symbol.toUpperCase().trim(), id:form.id||Date.now(), status:'open'})
     onClose()
   }
 
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:520,width:'95vw'}}>
-        <div className="modal-title">{item?'✏ Editează FOX':'🦊 Poziție FOX Nouă'}</div>
+        <div className="modal-title">{item?'✏ Editează FOX':'🦊 Poziție FOX — Deschisă'}</div>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-
-          {/* Companie */}
-          <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
-            <div className="label" style={{marginBottom:10,color:'var(--blue)'}}>INFORMAȚII COMPANIE</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,marginBottom:10}}>
-              <input className="input mono" placeholder="Symbol (ex: AAPL)" value={form.symbol}
-                onChange={e=>setForm(f=>({...f,symbol:e.target.value.toUpperCase()}))}
-                onBlur={fetchInfo}/>
-              <button className="btn btn-ghost btn-sm" onClick={fetchInfo} disabled={autoLoading} style={{whiteSpace:'nowrap'}}>
-                {autoLoading?'...':'⟳ Auto'}
-              </button>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Nume</div>
-                <input className="input" placeholder="Apple Inc." value={form.name} onChange={set('name')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Domeniu / Industrie</div>
-                <input className="input" placeholder="ex: Cloud Computing" value={form.domain} onChange={set('domain')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Sector</div>
-                <select className="select" value={form.sector} onChange={set('sector')}>
-                  <option value="">—</option>
-                  {SECTORS.map(s=><option key={s} value={s}>{S_ICON[s]} {s}</option>)}
-                </select>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Capitalizare</div>
-                <select className="select" value={form.cap} onChange={set('cap')}>
-                  <option value="">—</option>
-                  {CAPS.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
+          <CompanyInfoSection form={form} setForm={setForm} prices={prices} companyInfo={companyInfo} fetchCompanyInfo={fetchCompanyInfo}/>
 
           {/* Dețiteri */}
           <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
@@ -132,7 +130,7 @@ function FoxModal({ item, prices, companyInfo, onSave, onClose }) {
             </div>
             {cost>0&&<div style={{marginTop:8,fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
               Cost: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(cost)}</span>
-              {cur!=null&&<> · Profit: <span className={pnlClass(profit)} style={{fontWeight:600}}>{fmtC(profit)}</span> · ROI: <span className={pnlClass(roi)} style={{fontWeight:600}}>{fmtPct(roi)}</span></>}
+              {profit!=null&&<> · Profit: <span className={pnlClass(profit)} style={{fontWeight:600}}>{fmtC(profit)}</span> · ROI: <span className={pnlClass(roi)} style={{fontWeight:600}}>{fmtPct(roi)}</span></>}
             </div>}
           </div>
 
@@ -166,67 +164,182 @@ function FoxModal({ item, prices, companyInfo, onSave, onClose }) {
   )
 }
 
+// ── Modal: Poziție Închisă ────────────────────────────────
+function ClosedFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onClose }) {
+  const [form, setForm] = useState(item ? {...item} : {
+    id:Date.now(), symbol:'', name:'', sector:'', cap:'', domain:'',
+    buyShares:0, buyPrice:0, buyDate:'', buyTotal:0,
+    sellShares:0, sellPrice:0, sellDate:'', sellTotal:0,
+    profit:0, roi:0, notes:'',
+    status:'closed',
+  })
+  const [err, setErr] = useState('')
+  const setN = k => e => {
+    const v = +e.target.value||0
+    setForm(f=>{
+      const next = {...f,[k]:v}
+      // Auto-calc totals and profit
+      const buyTotal  = (k==='buyShares'?v:next.buyShares)  * (k==='buyPrice'?v:next.buyPrice)
+      const sellTotal = (k==='sellShares'?v:next.sellShares) * (k==='sellPrice'?v:next.sellPrice)
+      const profit    = sellTotal - buyTotal
+      const roi       = buyTotal>0 ? (profit/buyTotal)*100 : 0
+      return {...next, buyTotal, sellTotal, profit, roi}
+    })
+  }
+  const set = k => e => setForm(f=>({...f,[k]:e.target.value}))
+
+  const submit = () => {
+    if (!form.symbol?.trim())           { setErr('Symbol obligatoriu'); return }
+    if (!form.buyShares||!form.buyPrice){ setErr('Datele de cumpărare sunt obligatorii'); return }
+    if (!form.sellShares||!form.sellPrice){ setErr('Datele de vânzare sunt obligatorii'); return }
+    onSave({...form, symbol:form.symbol.toUpperCase().trim(), id:form.id||Date.now(), status:'closed'})
+    onClose()
+  }
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560,width:'95vw'}}>
+        <div className="modal-title">{item?'✏ Editează FOX Închisă':'✓ Poziție FOX — Închisă'}</div>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <CompanyInfoSection form={form} setForm={setForm} prices={prices} companyInfo={companyInfo} fetchCompanyInfo={fetchCompanyInfo}/>
+
+          {/* Buy */}
+          <div style={{background:'var(--green-bg)',borderRadius:8,padding:12,border:'1px solid var(--green-b)'}}>
+            <div className="label" style={{marginBottom:10,color:'var(--green)'}}>▲ CUMPĂRARE</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div>
+                <input className="input mono" type="number" min="0" step="any" value={form.buyShares||''} onChange={setN('buyShares')}/>
+              </div>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Preț Mediu</div>
+                <input className="input mono" type="number" min="0" step="any" value={form.buyPrice||''} onChange={setN('buyPrice')}/>
+              </div>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Data</div>
+                <input className="input" type="date" value={form.buyDate||''} onChange={set('buyDate')}/>
+              </div>
+            </div>
+            {form.buyTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>
+              Total cost: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.buyTotal)}</span>
+            </div>}
+          </div>
+
+          {/* Sell */}
+          <div style={{background:'var(--red-bg)',borderRadius:8,padding:12,border:'1px solid var(--red-b)'}}>
+            <div className="label" style={{marginBottom:10,color:'var(--red)'}}>▼ VÂNZARE</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div>
+                <input className="input mono" type="number" min="0" step="any" value={form.sellShares||''} onChange={setN('sellShares')}/>
+              </div>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Preț Vânzare</div>
+                <input className="input mono" type="number" min="0" step="any" value={form.sellPrice||''} onChange={setN('sellPrice')}/>
+              </div>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Data</div>
+                <input className="input" type="date" value={form.sellDate||''} onChange={set('sellDate')}/>
+              </div>
+            </div>
+            {form.sellTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>
+              Total vânzare: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.sellTotal)}</span>
+            </div>}
+          </div>
+
+          {/* Result */}
+          {(form.profit!==0||form.roi!==0)&&(
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,padding:'10px 14px',background:'var(--surface2)',borderRadius:8}}>
+              <div>
+                <div className="label" style={{marginBottom:4}}>Profit</div>
+                <div className={`mono ${pnlClass(form.profit)}`} style={{fontSize:16,fontWeight:700}}>{fmtC(form.profit)}</div>
+              </div>
+              <div>
+                <div className="label" style={{marginBottom:4}}>ROI</div>
+                <div className={`mono ${pnlClass(form.roi)}`} style={{fontSize:16,fontWeight:700}}>{fmtPct(form.roi)}</div>
+              </div>
+            </div>
+          )}
+
+          {err&&<div style={{color:'var(--red)',fontSize:12,padding:'8px 12px',background:'var(--red-bg)',borderRadius:6,border:'1px solid var(--red-b)'}}>{err}</div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" style={{flex:1}} onClick={onClose}>Anulează</button>
+          <button className="btn btn-primary" style={{flex:1}} onClick={submit}>Salvează</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────
 export default function FoxPositions() {
   const { foxData, setFoxData, prices, companyInfo, fetchCompanyInfo, isAdmin } = useStore()
-  const [sortBy,       setSortBy]       = useState('pondere')
-  const [showModal,    setShowModal]    = useState(false)
-  const [editItem,     setEditItem]     = useState(null)
-  const [filterSector, setFilterSector] = useState('ALL')
-  const [view,         setView]         = useState('open')
+  const [sortBy,        setSortBy]        = useState('pondere')
+  const [showOpenModal, setShowOpenModal] = useState(false)
+  const [showClosedModal,setShowClosedModal] = useState(false)
+  const [editItem,      setEditItem]      = useState(null)
+  const [filterSector,  setFilterSector]  = useState('ALL')
+  const [view,          setView]          = useState('open')
 
-  // Fetch company info for new symbols
+  // Fetch company info for symbols not yet cached
   useEffect(() => {
-    const syms = foxData.map(f=>f.symbol).filter(s=>!companyInfo[s]||!companyInfo[s].sector)
+    const syms = [...new Set(foxData.map(f=>f.symbol))].filter(s=>s&&!companyInfo[s]?.sector)
     if (syms.length) fetchCompanyInfo(syms)
-  }, [foxData.map(f=>f.symbol).join(',')])
+  }, [foxData.length])
 
-  // Enrich with live prices + companyInfo
-  const enriched = useMemo(() => foxData.map(f => {
-    const cur    = prices[f.symbol]?.price ?? null
-    const prev   = prices[f.symbol]?.prev  ?? null
-    const info   = companyInfo[f.symbol]   || {}
-    const cost   = f.shares * f.avgPrice
-    const curVal = cur != null ? cur * f.shares : null
-    const profit = curVal != null ? curVal - cost : null
-    const roi    = f.avgPrice>0&&cur!=null ? ((cur-f.avgPrice)/f.avgPrice)*100 : null
-    const dayChg = cur&&prev ? ((cur-prev)/prev)*100 : null
-    const inBuyZone = cur!=null && f.buyMin && cur <= f.buyMin
-    const inSellZone = cur!=null && f.sellMin && cur >= f.sellMin
-    return {
-      ...f,
-      // Auto-fill from companyInfo if not set manually
-      sector: f.sector || info.sector || '',
-      cap:    f.cap    || info.cap    || '',
-      domain: f.domain || info.domain || info.industry || '',
-      name:   f.name   || prices[f.symbol]?.name || f.symbol,
-      cur, cost, curVal, profit, roi, dayChg, inBuyZone, inSellZone,
-      pondere: 0, // computed below
-    }
-  }), [foxData, prices, companyInfo])
+  // Separate open vs closed
+  const openFox   = useMemo(() => foxData.filter(f => f.status!=='closed'), [foxData])
+  const closedFox = useMemo(() => foxData.filter(f => f.status==='closed'), [foxData])
 
-  const totalCost = enriched.reduce((s,f)=>s+f.cost,0)
-  const withPondere = enriched.map(f=>({...f, pondere: totalCost>0?(f.cost/totalCost)*100:0}))
+  // Enrich open positions
+  const enrichedOpen = useMemo(() => {
+    const totalCost = openFox.reduce((s,f)=>s+((f.shares||0)*(f.avgPrice||0)),0)
+    return openFox.map(f=>{
+      const cur    = prices[f.symbol]?.price ?? null
+      const prev   = prices[f.symbol]?.prev  ?? null
+      const info   = companyInfo[f.symbol]   || {}
+      const cost   = (f.shares||0) * (f.avgPrice||0)
+      const curVal = cur!=null ? cur*(f.shares||0) : null
+      const profit = curVal!=null ? curVal-cost : null
+      const roi    = f.avgPrice>0&&cur!=null ? ((cur-f.avgPrice)/f.avgPrice)*100 : null
+      const dayChg = cur&&prev ? ((cur-prev)/prev)*100 : null
+      const pondere = totalCost>0 ? (cost/totalCost)*100 : 0
+      const inBuyZone  = cur!=null&&f.buyMin  ? cur<=f.buyMin  : false
+      const inSellZone = cur!=null&&f.sellMin ? cur>=f.sellMin : false
+      return {...f,
+        sector: f.sector||info.sector||'', cap: f.cap||info.cap||'',
+        domain: f.domain||info.domain||info.industry||'',
+        name:   f.name||prices[f.symbol]?.name||f.symbol,
+        cur, cost, curVal, profit, roi, dayChg, pondere, inBuyZone, inSellZone,
+      }
+    })
+  }, [openFox, prices, companyInfo])
 
-  // Split open / closed  — treat shares>0 as open
-  const openFox   = withPondere.filter(f => f.shares > 0)
-  const closedFox = withPondere.filter(f => f.shares <= 0)
+  const totalOpenCost   = enrichedOpen.reduce((s,f)=>s+f.cost,0)
+  const totalOpenVal    = enrichedOpen.reduce((s,f)=>s+(f.curVal||0),0)
+  const totalOpenProfit = enrichedOpen.reduce((s,f)=>s+(f.profit||0),0)
+  const totalOpenRoi    = totalOpenCost>0 ? (totalOpenProfit/totalOpenCost)*100 : 0
 
-  const filtered = useMemo(() => {
-    const arr = (view==='open'?openFox:closedFox).filter(f => filterSector==='ALL'||f.sector===filterSector)
-    return [...arr].sort((a,b) => {
-      if(sortBy==='pondere') return b.pondere - a.pondere
-      if(sortBy==='profit')  return (b.profit||0) - (a.profit||0)
-      if(sortBy==='roi')     return (b.roi||0) - (a.roi||0)
+  const totalClosedProfit = closedFox.reduce((s,f)=>s+(f.profit||0),0)
+  const totalClosedCost   = closedFox.reduce((s,f)=>s+(f.buyTotal||0),0)
+  const totalClosedRoi    = totalClosedCost>0 ? (totalClosedProfit/totalClosedCost)*100 : 0
+
+  const filteredOpen = useMemo(()=>{
+    const arr = filterSector==='ALL' ? enrichedOpen : enrichedOpen.filter(f=>f.sector===filterSector)
+    return [...arr].sort((a,b)=>{
+      if(sortBy==='pondere') return b.pondere-a.pondere
+      if(sortBy==='profit')  return (b.profit||0)-(a.profit||0)
+      if(sortBy==='roi')     return (b.roi||0)-(a.roi||0)
       if(sortBy==='symbol')  return a.symbol.localeCompare(b.symbol)
       return 0
     })
-  }, [openFox, closedFox, view, filterSector, sortBy])
+  },[enrichedOpen, filterSector, sortBy])
 
-  const totalProfit = openFox.reduce((s,f)=>s+(f.profit||0),0)
-  const totalVal    = openFox.reduce((s,f)=>s+(f.curVal||0),0)
-  const totalRoi    = totalCost>0 ? (totalProfit/totalCost)*100 : 0
-  const uniqueSectors = ['ALL',...new Set(foxData.map(f=>f.sector).filter(Boolean))]
+  const filteredClosed = useMemo(()=>{
+    const arr = filterSector==='ALL' ? closedFox : closedFox.filter(f=>f.sector===filterSector)
+    return [...arr].sort((a,b)=>(b.profit||0)-(a.profit||0))
+  },[closedFox, filterSector])
 
   const saveFox = (item) => {
     const next = editItem ? foxData.map(f=>f.id===editItem.id?item:f) : [...foxData,item]
@@ -235,6 +348,7 @@ export default function FoxPositions() {
   }
   const deleteFox = (id) => { if(confirm('Ștergi?')) setFoxData(foxData.filter(f=>f.id!==id)) }
 
+  const uniqueSectors = ['ALL',...new Set(foxData.map(f=>f.sector).filter(Boolean))]
   const SortBtn = ({val,label}) => (
     <button onClick={()=>setSortBy(val)} style={{
       padding:'3px 8px',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
@@ -243,6 +357,8 @@ export default function FoxPositions() {
     }}>{label}</button>
   )
 
+  const modalProps = { prices, companyInfo, fetchCompanyInfo, onClose:()=>{setShowOpenModal(false);setShowClosedModal(false);setEditItem(null)} }
+
   return (
     <div className="fade-up">
       {/* Header */}
@@ -250,25 +366,32 @@ export default function FoxPositions() {
         <div>
           <h2 style={{fontSize:16,fontWeight:700,color:'var(--text)',marginBottom:4}}>
             🦊 Poziții FOX
-            <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · sincronizat cloud</span>
+            <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
           </h2>
           <div style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
-            {openFox.length} deschise · cost {fmtC(totalCost)} · val {fmtC(totalVal)} ·{' '}
-            <span className={pnlClass(totalProfit)} style={{fontWeight:600}}>{fmtPct(totalRoi)}</span>
+            {openFox.length} deschise · {closedFox.length} închise
           </div>
         </div>
         {isAdmin&&(
-          <button className="btn btn-primary btn-sm" onClick={()=>{setEditItem(null);setShowModal(true)}}>+ Adaugă</button>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setEditItem(null);setShowClosedModal(true)}}>✓ Adaugă Închisă</button>
+            <button className="btn btn-primary btn-sm" onClick={()=>{setEditItem(null);setShowOpenModal(true)}}>+ Deschisă</button>
+          </div>
         )}
       </div>
 
       {/* Summary cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>
-        {[
-          {label:'Cost Total',    val:fmtC(totalCost),   accent:'var(--text3)',  v:null},
-          {label:'Valoare',       val:fmtC(totalVal),    accent:'var(--blue)',   v:null},
-          {label:'Profit',        val:fmtC(totalProfit), accent:totalProfit>=0?'var(--green)':'var(--red)', v:totalProfit},
-          {label:'ROI',           val:fmtPct(totalRoi),  accent:totalRoi>=0?'var(--green)':'var(--red)',   v:totalRoi},
+        {view==='open'?[
+          {label:'Cost Total',   val:fmtC(totalOpenCost),   accent:'var(--text3)', v:null},
+          {label:'Valoare',      val:fmtC(totalOpenVal),    accent:'var(--blue)',  v:null},
+          {label:'Profit',       val:fmtC(totalOpenProfit), accent:totalOpenProfit>=0?'var(--green)':'var(--red)',  v:totalOpenProfit},
+          {label:'ROI',          val:fmtPct(totalOpenRoi),  accent:totalOpenRoi>=0?'var(--green)':'var(--red)',    v:totalOpenRoi},
+        ]:[
+          {label:'Cost Cumpărare', val:fmtC(totalClosedCost),   accent:'var(--text3)', v:null},
+          {label:'Profit Realizat',val:fmtC(totalClosedProfit), accent:totalClosedProfit>=0?'var(--green)':'var(--red)', v:totalClosedProfit},
+          {label:'ROI Mediu',      val:fmtPct(totalClosedRoi),  accent:totalClosedRoi>=0?'var(--green)':'var(--red)',   v:totalClosedRoi},
+          {label:'Poziții',        val:closedFox.length,         accent:'var(--purple)', v:null},
         ].map(c=>(
           <div key={c.label} className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${c.accent}`}}>
             <div className="label" style={{marginBottom:6}}>{c.label}</div>
@@ -277,7 +400,7 @@ export default function FoxPositions() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters + toggle */}
       <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         {[{id:'open',label:`▶ Deschise (${openFox.length})`},{id:'closed',label:`✓ Închise (${closedFox.length})`}].map(t=>(
           <button key={t.id} onClick={()=>setView(t.id)} style={{
@@ -293,24 +416,25 @@ export default function FoxPositions() {
             color:filterSector===s?'#fff':'var(--text3)',transition:'all .15s',
           }}>{s==='ALL'?'Toate':`${S_ICON[s]||''} ${s}`}</button>
         ))}
-        <div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center'}}>
+        {view==='open'&&<div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center'}}>
           <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)'}}>SORT:</span>
           <SortBtn val="pondere" label="PONDERE"/>
           <SortBtn val="profit"  label="PROFIT"/>
           <SortBtn val="roi"     label="ROI"/>
           <SortBtn val="symbol"  label="A-Z"/>
-        </div>
+        </div>}
       </div>
 
       {foxData.length===0&&(
         <div className="card" style={{padding:'60px 20px',textAlign:'center'}}>
           <div style={{fontSize:40,marginBottom:12}}>🦊</div>
           <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>Nicio poziție FOX</div>
-          <div style={{color:'var(--text3)',fontSize:13}}>Adaugă poziții de urmărit independent.</div>
+          <div style={{color:'var(--text3)',fontSize:13}}>Adaugă poziții deschise sau închise independent de portofoliul principal.</div>
         </div>
       )}
 
-      {filtered.length>0&&(
+      {/* ── OPEN TABLE ── */}
+      {view==='open'&&filteredOpen.length>0&&(
         <div className="card" style={{overflow:'hidden'}}>
           <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
             <table className="data-table" style={{minWidth:860}}>
@@ -324,26 +448,24 @@ export default function FoxPositions() {
                 </tr>
                 <tr>
                   <th style={STICKY_H}>Symbol</th>
-                  <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Sector · Cap</th>
+                  <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Cap</th>
                   <th>Acțiuni</th>
                   <th>Preț Mediu</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Pondere</th>
                   <th>Buy Min</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Sell Min–Max</th>
-                  <th>Preț Actual</th>
+                  <th>Preț</th>
                   <th style={{textAlign:'right'}}>Profit</th>
                   <th style={{textAlign:'right'}}>ROI</th>
                   {isAdmin&&<th/>}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(f=>(
-                  <tr key={f.id} style={{
-                    background: f.inBuyZone?'rgba(0,212,170,0.04)':f.inSellZone?'rgba(240,180,41,0.04)':'',
-                  }}>
-                    <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                      <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{f.symbol}</div>
-                      <div style={{fontSize:10,color:'var(--text3)',marginTop:1}}>{f.name}</div>
+                {filteredOpen.map(f=>(
+                  <tr key={f.id} style={{background:f.inBuyZone?'rgba(0,212,170,0.04)':f.inSellZone?'rgba(240,180,41,0.04)':''}}>
+                    <td style={{...STICKY,borderRight:'1px solid var(--border)'}}>
+                      <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{f.symbol}</div>
+                      <div style={{fontSize:10,color:'var(--text3)',whiteSpace:'normal',lineHeight:1.3}}>{f.name}</div>
                     </td>
                     <td style={{borderRight:'1px solid var(--border)'}}>
                       <div style={{fontSize:11,color:'var(--blue)',fontWeight:500}}>{f.domain||'—'}</div>
@@ -363,17 +485,17 @@ export default function FoxPositions() {
                       </div>
                     </td>
                     <td>
-                      {f.inBuyZone&&<span className="badge badge-green" style={{fontSize:9,marginRight:4}}>🟢 BUY</span>}
+                      {f.inBuyZone&&<span style={{fontSize:9,color:'var(--green)',fontWeight:700,marginRight:4}}>🟢</span>}
                       <span className="mono" style={{fontSize:11,color:'var(--gold)'}}>{f.buyMin?`≤${f.buyMin}`:'—'}</span>
                     </td>
                     <td style={{borderRight:'1px solid var(--border)'}}>
-                      {f.inSellZone&&<span className="badge badge-gold" style={{fontSize:9,marginRight:4}}>⚡ SELL</span>}
+                      {f.inSellZone&&<span style={{fontSize:9,color:'var(--gold)',fontWeight:700,marginRight:4}}>⚡</span>}
                       <span className="mono" style={{fontSize:11,color:'var(--purple)'}}>
                         {f.sellMin&&f.sellMax?`${f.sellMin}–${f.sellMax}`:f.sellMin?`≥${f.sellMin}`:f.sellMax?`≤${f.sellMax}`:'—'}
                       </span>
                     </td>
                     <td>
-                      <div className="mono" style={{fontSize:12,fontWeight:600,color:'var(--text)'}}>{f.cur!=null?fmtC(f.cur):'—'}</div>
+                      <div className="mono" style={{fontSize:12,fontWeight:600}}>{f.cur!=null?fmtC(f.cur):'—'}</div>
                       {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
                     </td>
                     <td style={{textAlign:'right'}}>
@@ -384,7 +506,7 @@ export default function FoxPositions() {
                     </td>
                     {isAdmin&&<td>
                       <div style={{display:'flex',gap:4}}>
-                        <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={()=>{setEditItem(f);setShowModal(true)}}>✏</button>
+                        <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={()=>{setEditItem(f);setShowOpenModal(true)}}>✏</button>
                         <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={()=>deleteFox(f.id)}>✕</button>
                       </div>
                     </td>}
@@ -396,15 +518,90 @@ export default function FoxPositions() {
         </div>
       )}
 
-      {showModal&&isAdmin&&(
-        <FoxModal
-          item={editItem}
-          prices={prices}
-          companyInfo={companyInfo}
-          onSave={saveFox}
-          onClose={()=>{setShowModal(false);setEditItem(null)}}
-        />
+      {/* ── CLOSED TABLE ── */}
+      {view==='closed'&&(
+        filteredClosed.length===0 ? (
+          <div className="card" style={{padding:'40px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
+            Nicio poziție FOX închisă. Adaugă cu butonul "✓ Adaugă Închisă".
+          </div>
+        ) : (
+          <div className="card" style={{overflow:'hidden'}}>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table className="data-table" style={{minWidth:780}}>
+                <thead>
+                  <tr>
+                    <th colSpan={2} style={{background:'var(--surface3)',color:'var(--text3)',borderRight:'1px solid var(--border2)'}}>COMPANIE</th>
+                    <th colSpan={3} style={{background:'var(--green-bg)',color:'var(--green)',borderRight:'1px solid var(--border2)'}}>▲ CUMPĂRARE</th>
+                    <th colSpan={3} style={{background:'var(--red-bg)',color:'var(--red)',borderRight:'1px solid var(--border2)'}}>▼ VÂNZARE</th>
+                    <th colSpan={2} style={{background:'var(--surface2)',color:'var(--blue)'}}>REZULTAT</th>
+                    {isAdmin&&<th style={{background:'var(--surface2)'}}/>}
+                  </tr>
+                  <tr>
+                    <th style={STICKY_H}>Symbol</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Cap</th>
+                    <th>Nr. Acțiuni</th>
+                    <th>Preț Mediu</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Total Cost</th>
+                    <th>Nr. Acțiuni</th>
+                    <th>Preț</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Total</th>
+                    <th style={{textAlign:'right'}}>Profit</th>
+                    <th style={{textAlign:'right'}}>ROI</th>
+                    {isAdmin&&<th/>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClosed.map(f=>(
+                    <tr key={f.id}>
+                      <td style={{...STICKY,borderRight:'1px solid var(--border)'}}>
+                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{f.symbol}</div>
+                        <div style={{fontSize:10,color:'var(--text3)',whiteSpace:'normal',lineHeight:1.3}}>{f.name}</div>
+                        {f.sellDate&&<div style={{fontSize:9,color:'var(--text3)',marginTop:2}}>{fmtDate(f.sellDate)}</div>}
+                      </td>
+                      <td style={{borderRight:'1px solid var(--border)'}}>
+                        <div style={{fontSize:11,color:'var(--blue)',fontWeight:500}}>{f.domain||'—'}</div>
+                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
+                          {f.sector&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                          {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
+                        </div>
+                      </td>
+                      <td><span className="mono" style={{fontSize:12}}>{f.buyShares||'—'}</span></td>
+                      <td><span className="mono" style={{fontSize:12}}>{f.buyPrice?fmtC(f.buyPrice):'—'}</span></td>
+                      <td style={{borderRight:'1px solid var(--border)'}}><span className="mono" style={{fontSize:12,fontWeight:600}}>{f.buyTotal?fmtC(f.buyTotal):'—'}</span></td>
+                      <td><span className="mono" style={{fontSize:12}}>{f.sellShares||'—'}</span></td>
+                      <td><span className="mono" style={{fontSize:12}}>{f.sellPrice?fmtC(f.sellPrice):'—'}</span></td>
+                      <td style={{borderRight:'1px solid var(--border)'}}><span className="mono" style={{fontSize:12,fontWeight:600}}>{f.sellTotal?fmtC(f.sellTotal):'—'}</span></td>
+                      <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(f.profit)}`} style={{fontSize:13,fontWeight:700}}>{f.profit!=null?fmtC(f.profit):'—'}</span></td>
+                      <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(f.roi)}`} style={{fontSize:13,fontWeight:700}}>{f.roi!=null?fmtPct(f.roi):'—'}</span></td>
+                      {isAdmin&&<td>
+                        <div style={{display:'flex',gap:4}}>
+                          <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={()=>{setEditItem(f);setShowClosedModal(true)}}>✏</button>
+                          <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={()=>deleteFox(f.id)}>✕</button>
+                        </div>
+                      </td>}
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="total-row">
+                    <td colSpan={4} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
+                    <td><span className="mono" style={{fontWeight:700}}>{fmtC(totalClosedCost)}</span></td>
+                    <td colSpan={2}/>
+                    <td style={{borderRight:'1px solid var(--border)'}}/>
+                    <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(totalClosedProfit)}`} style={{fontWeight:700}}>{fmtC(totalClosedProfit)}</span></td>
+                    <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(totalClosedRoi)}`} style={{fontWeight:700}}>{fmtPct(totalClosedRoi)}</span></td>
+                    {isAdmin&&<td/>}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )
       )}
+
+      {/* Modals */}
+      {showOpenModal&&isAdmin&&<OpenFoxModal {...modalProps} item={editItem?.status!=='closed'?editItem:null} onSave={saveFox}/>}
+      {showClosedModal&&isAdmin&&<ClosedFoxModal {...modalProps} item={editItem?.status==='closed'?editItem:null} onSave={saveFox}/>}
     </div>
   )
 }
