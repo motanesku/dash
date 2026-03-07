@@ -1,8 +1,17 @@
 import { SHEETS_URL, USE_CLOUD } from '../config.js';
 
-const LOCAL_KEY = 'ptf_v6_txs';
+const LOCAL_KEY   = 'ptf_v6_txs';
 const BROKERS_KEY = 'ptf_v6_brokers';
-const ALERTS_KEY = 'ptf_v6_alerts';
+const ALERTS_KEY  = 'ptf_v6_alerts';
+
+// ── POST helper ────────────────────────────────────────────
+async function sheetsPost(body) {
+  return fetch(SHEETS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
 
 // ── Transactions ───────────────────────────────────────────
 export async function loadTransactions() {
@@ -10,11 +19,11 @@ export async function loadTransactions() {
     try {
       const r = await fetch(SHEETS_URL + '?action=getTxs');
       const j = await r.json();
-      if (j.ok) return j.data.map(row => ({
+      if (j.ok && j.data) return j.data.map(row => ({
         ...row,
-        id: Number(row.id) || row.id,
+        id:     Number(row.id) || row.id,
         shares: Number(row.shares),
-        price: Number(row.price),
+        price:  Number(row.price),
       }));
     } catch (e) { console.warn('Cloud load failed:', e.message); }
   }
@@ -28,34 +37,34 @@ export function saveTransactionsLocal(txs) {
   try { localStorage.setItem(LOCAL_KEY, JSON.stringify(txs)); } catch {}
 }
 
-export async function addTransaction(tx) {
-  if (USE_CLOUD) {
-    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) }); }
-    catch (e) { console.warn('Cloud add failed:', e.message); }
-  }
+// Save ALL txs to Sheets (replaces everything)
+async function saveAllTxs(txs) {
+  if (!USE_CLOUD) return;
+  try { await sheetsPost({ action: 'saveTxs', data: txs }); }
+  catch (e) { console.warn('Cloud saveTxs failed:', e.message); }
 }
 
-export async function updateTransaction(tx) {
-  if (USE_CLOUD) {
-    try {
-      await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: tx.id }) });
-      await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) });
-    } catch (e) { console.warn('Cloud update failed:', e.message); }
-  }
+// Called from store after any tx change — pass full list
+export async function addTransaction(tx, allTxs) {
+  if (USE_CLOUD && allTxs) await saveAllTxs(allTxs);
 }
 
-export async function deleteTransaction(id) {
-  if (USE_CLOUD) {
-    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id }) }); }
-    catch (e) { console.warn('Cloud delete failed:', e.message); }
-  }
+export async function updateTransaction(tx, allTxs) {
+  if (USE_CLOUD && allTxs) await saveAllTxs(allTxs);
 }
 
-export async function bulkAddTransactions(txs) {
-  if (USE_CLOUD) {
-    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'addBulk', txs }) }); }
-    catch (e) { console.warn('Cloud bulk add failed:', e.message); }
-  }
+export async function deleteTransaction(id, allTxs) {
+  if (USE_CLOUD && allTxs) await saveAllTxs(allTxs);
+}
+
+export async function bulkAddTransactions(txs, allTxs) {
+  if (USE_CLOUD && allTxs) await saveAllTxs(allTxs);
+  else if (USE_CLOUD && txs) await saveAllTxs(txs);
+}
+
+// Direct save — use this from store after import
+export async function syncTransactionsToCloud(txs) {
+  await saveAllTxs(txs);
 }
 
 // ── Club data ──────────────────────────────────────────────
@@ -76,8 +85,7 @@ export async function loadClub() {
 export async function saveClub(club) {
   try { localStorage.setItem('ptf_v6_club', JSON.stringify(club)); } catch {}
   if (USE_CLOUD) {
-    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'saveClub', club }) }); }
-    catch {}
+    try { await sheetsPost({ action: 'saveClub', data: club }); } catch {}
   }
 }
 
@@ -121,13 +129,13 @@ export function parseImportFile(file, cb) {
         }
         const headers = rows[hi].map(c => String(c).toLowerCase().trim());
         const idx = {
-          sym: ['symbol', 'ticker', 'simbol'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
+          sym:    ['symbol', 'ticker', 'simbol'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
           shares: ['shares', 'qty', 'quantity', 'cantitate'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
-          price: ['price', 'pret', 'pret mediu', 'avg price'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
-          date: ['date', 'data'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
-          type: ['type', 'tip', 'action'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
+          price:  ['price', 'pret', 'pret mediu', 'avg price'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
+          date:   ['date', 'data'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
+          type:   ['type', 'tip', 'action'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
           broker: ['broker'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
-          notes: ['notes', 'note', 'observatii'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
+          notes:  ['notes', 'note', 'observatii'].map(k => headers.indexOf(k)).find(i => i >= 0) ?? -1,
         };
         if (idx.sym < 0 || idx.shares < 0 || idx.price < 0) {
           cb({ ok: false, error: 'Coloane lipsă: symbol, shares, price' }); return;
@@ -137,18 +145,18 @@ export function parseImportFile(file, cb) {
         for (let i = hi + 1; i < rows.length; i++) {
           const r = rows[i];
           if (!r[idx.sym]) continue;
-          const sym = String(r[idx.sym]).toUpperCase().trim();
+          const sym    = String(r[idx.sym]).toUpperCase().trim();
           const shares = parseFloat(r[idx.shares]);
-          const price = parseFloat(r[idx.price]);
-          const date = idx.date >= 0 ? excelDate(r[idx.date]) : new Date().toISOString().split('T')[0];
+          const price  = parseFloat(r[idx.price]);
+          const date   = idx.date >= 0 ? excelDate(r[idx.date]) : new Date().toISOString().split('T')[0];
           const rawType = idx.type >= 0 ? String(r[idx.type]).toUpperCase() : 'BUY';
-          const type = rawType.includes('SELL') ? 'SELL' : rawType.includes('DEP') ? 'DEPOSIT' : 'BUY';
+          const type   = rawType.includes('SELL') ? 'SELL' : rawType.includes('DEP') ? 'DEPOSIT' : 'BUY';
           const broker = idx.broker >= 0 ? String(r[idx.broker]).trim() || 'XTB' : 'XTB';
-          const notes = idx.notes >= 0 ? String(r[idx.notes]) : '';
+          const notes  = idx.notes >= 0 ? String(r[idx.notes]) : '';
           const errors = [];
           if (!sym) errors.push('symbol lipsă');
           if (isNaN(shares) || shares <= 0) errors.push('shares invalid');
-          if (isNaN(price) || price <= 0) errors.push('price invalid');
+          if (isNaN(price)  || price  <= 0) errors.push('price invalid');
           out.push({ sym, shares, price, date, type, broker, notes, errors, selected: errors.length === 0 });
         }
         cb({ ok: true, rows: out });
