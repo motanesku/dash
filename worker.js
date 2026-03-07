@@ -11,7 +11,8 @@
 const CACHE_TTL = 60; // seconds
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
   'Content-Type': 'application/json',
 };
 
@@ -36,6 +37,10 @@ export default {
       }
       if (path === '/api/feargreed') {
         return await handleFearGreed(env);
+      }
+      // ── Google Sheets proxy ───────────────────────────────
+      if (path === '/api/sheets') {
+        return await handleSheets(url, request, env);
       }
       return json({ ok: false, error: 'Not found' }, 404);
     } catch (e) {
@@ -235,6 +240,47 @@ async function handleFearGreed(env) {
       await env.CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 3600 });
     }
     return json({ ok: true, ...payload });
+  } catch (e) {
+    return json({ ok: false, error: e.message });
+  }
+}
+
+
+// ── /api/sheets — proxy Google Apps Script (evită CORS) ───
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOH7osGZ4QfOmJhVqzUqe1T7EjZ_RZq8t2MOSnCJ4Q0AUWQNzSQdU3L3rR5GdKjouE/exec';
+
+async function handleSheets(url, request, env) {
+  try {
+    const action = url.searchParams.get('action') || 'getTxs';
+
+    if (request.method === 'POST') {
+      // Forward POST (save)
+      const body = await request.text();
+      const r = await fetch(SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        redirect: 'follow',
+      });
+      const text = await r.text();
+      try {
+        return json(JSON.parse(text));
+      } catch {
+        return json({ ok: false, error: 'Script error: ' + text.slice(0, 200) });
+      }
+    } else {
+      // Forward GET (load)
+      const r = await fetch(`${SCRIPT_URL}?action=${action}`, {
+        redirect: 'follow',
+        headers: { 'Accept': 'application/json' },
+      });
+      const text = await r.text();
+      try {
+        return json(JSON.parse(text));
+      } catch {
+        return json({ ok: false, error: 'Script error: ' + text.slice(0, 200) });
+      }
+    }
   } catch (e) {
     return json({ ok: false, error: e.message });
   }
