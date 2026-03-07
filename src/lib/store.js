@@ -197,12 +197,14 @@ const useStore = create((set, get) => ({
       try {
         const r = await fetch(`${SHEETS_URL}?action=getFox`);
         const j = await r.json();
-        if (j.ok && Array.isArray(j.data)) {
-          const clean = j.data.filter(f => !f.type || f.type === 'FOX');
+        if (j.ok && Array.isArray(j.data) && j.data.length > 0) {
+          // Sheets are non-empty — use as source of truth
+          const clean = j.data.filter(f => !f.type || f.type === 'FOX' || f.status === 'open' || f.status === 'closed');
           set({ foxData: clean });
           try { localStorage.setItem('ptf_v6_fox2', JSON.stringify(clean)); } catch {}
           return;
         }
+        // Sheets empty — keep localStorage data (don't overwrite)
       } catch {}
     }
     // Already loaded from localStorage on init
