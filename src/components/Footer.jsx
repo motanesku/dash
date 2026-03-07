@@ -18,7 +18,7 @@ export default function Footer() {
       <img 
   src="/dash/MOTANESCU.png" 
   alt="Motanescu" 
-  style={{width:50, height:50, objectFit:'contain', opacity:0.7, filter:'var(--cat-filter)'}} 
+  style={{width:48, height:48, objectFit:'contain', opacity:0.7, filter:'var(--cat-filter)'}} 
 />
 
       <div style={{display:'flex',flexDirection:'column',gap:1}}>
@@ -39,7 +39,7 @@ export default function Footer() {
           opacity:0.5,
           letterSpacing:'0.08em',
         }}>
-               - PORTFOLIO TRACKER -
+                - PORTFOLIO TRACKER -
         </span>
       </div>
     </footer>
