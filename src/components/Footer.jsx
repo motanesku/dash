@@ -15,7 +15,7 @@ export default function Footer() {
       marginTop: 'auto',
     }}>
       {/* Motanul SVG - văzut din spate, cu coada ridicată */}
-      <img src="/dash/MOTANESCU.jpg" alt="Motanescu" style={{width:42, height:42, objectFit:'cover', borderRadius:'50%', opacity:0.75}} />
+      <img src="/dash/MOTANESCU.png" alt="Motanescu" style={{width:42, height:42, objectFit:'cover', borderRadius:'50%', opacity:0.75}} />
 
       <div style={{display:'flex',flexDirection:'column',gap:1}}>
         <span style={{
@@ -35,7 +35,7 @@ export default function Footer() {
           opacity:0.5,
           letterSpacing:'0.08em',
         }}>
-            - PORTFOLIO TRACKER -
+             - PORTFOLIO TRACKER -
         </span>
       </div>
     </footer>
