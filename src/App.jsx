@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import useStore from './lib/store.js'
 import Header from './components/Header.jsx'
 import Nav from './components/Nav.jsx'
+import Footer from './components/Footer.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Positions from './pages/Positions.jsx'
 import FoxPositions from './pages/FoxPositions.jsx'
@@ -79,6 +80,7 @@ export default function App() {
       {showAddTx  && <AddTxModal tx={editTx} onClose={() => { setShowAddTx(false); setEditTx(null) }} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
       {showAlerts && <AlertsPanel onClose={() => setShowAlerts(false)} />}
+      <Footer />
     </div>
   )
 }
