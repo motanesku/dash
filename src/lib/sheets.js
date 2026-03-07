@@ -1,4 +1,4 @@
-import { SCRIPT_URL, USE_CLOUD } from '../config.js';
+import { SHEETS_URL, USE_CLOUD } from '../config.js';
 
 const LOCAL_KEY = 'ptf_v6_txs';
 const BROKERS_KEY = 'ptf_v6_brokers';
@@ -8,7 +8,7 @@ const ALERTS_KEY = 'ptf_v6_alerts';
 export async function loadTransactions() {
   if (USE_CLOUD) {
     try {
-      const r = await fetch(SCRIPT_URL);
+      const r = await fetch(SHEETS_URL + '?action=getTxs');
       const j = await r.json();
       if (j.ok) return j.data.map(row => ({
         ...row,
@@ -30,7 +30,7 @@ export function saveTransactionsLocal(txs) {
 
 export async function addTransaction(tx) {
   if (USE_CLOUD) {
-    try { await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) }); }
+    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) }); }
     catch (e) { console.warn('Cloud add failed:', e.message); }
   }
 }
@@ -38,22 +38,22 @@ export async function addTransaction(tx) {
 export async function updateTransaction(tx) {
   if (USE_CLOUD) {
     try {
-      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: tx.id }) });
-      await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) });
+      await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: tx.id }) });
+      await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'add', tx }) });
     } catch (e) { console.warn('Cloud update failed:', e.message); }
   }
 }
 
 export async function deleteTransaction(id) {
   if (USE_CLOUD) {
-    try { await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id }) }); }
+    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id }) }); }
     catch (e) { console.warn('Cloud delete failed:', e.message); }
   }
 }
 
 export async function bulkAddTransactions(txs) {
   if (USE_CLOUD) {
-    try { await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'addBulk', txs }) }); }
+    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'addBulk', txs }) }); }
     catch (e) { console.warn('Cloud bulk add failed:', e.message); }
   }
 }
@@ -62,9 +62,9 @@ export async function bulkAddTransactions(txs) {
 export async function loadClub() {
   if (USE_CLOUD) {
     try {
-      const r = await fetch(SCRIPT_URL + '?action=getClub');
+      const r = await fetch(SHEETS_URL + '?action=getClub');
       const j = await r.json();
-      if (j.ok && j.club) return j.club;
+      if (j.ok && j.data) return j.data;
     } catch {}
   }
   try {
@@ -76,7 +76,7 @@ export async function loadClub() {
 export async function saveClub(club) {
   try { localStorage.setItem('ptf_v6_club', JSON.stringify(club)); } catch {}
   if (USE_CLOUD) {
-    try { await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'saveClub', club }) }); }
+    try { await fetch(SHEETS_URL, { method: 'POST', body: JSON.stringify({ action: 'saveClub', club }) }); }
     catch {}
   }
 }
