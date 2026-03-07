@@ -131,7 +131,7 @@ export const MARKET_SYMBOLS = [
   { sym: 'GC=F', label: 'Gold' },
   { sym: 'CL=F', label: 'Oil' },
   { sym: 'BTC-USD', label: 'Bitcoin' },
-  { sym: 'EURUSD=X', label: 'EUR/USD' },
+  { sym: 'EURRON=X', label: 'EUR/RON' },
   { sym: 'RON=X', label: 'USD/RON' },
 ];
 
