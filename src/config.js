@@ -5,7 +5,7 @@
 export const ADMIN_PIN = '1980'; // ← schimbă PIN-ul!
 
 // URL-ul Apps Script (din Google Sheets → Extensions → Apps Script → Deploy)
-export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtnXwqqr6gXbNEnswwIsnUxcCKPIJY3bGskRpJpCBaxhI9LQH_gtKvDHC-DSmeSInc/exec';
+export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOH7osGZ4QfOmJhVqzUqe1T7EjZ_RZq8t2MOSnCJ4Q0AUWQNzSQdU3L3rR5GdKjouE/exec';
 
 // URL-ul Cloudflare Worker (după deploy pe cloudflare.com)
 export const WORKER_URL = 'https://worker.danut-fagadau.workers.dev';
