@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import useStore from '../lib/store.js'
 import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
+import { CompanyInfoCard, SECTOR_ICONS, CAP_COLORS as CAP_COLORS_NEW, CAPS, SECTORS } from '../components/CompanyInfoSection.jsx'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
 const CAP_COLORS    = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
@@ -214,9 +215,10 @@ export default function Positions({ onEditTx }) {
                         <div style={{fontSize:10,color:'var(--text3)',marginTop:2,whiteSpace:'normal',lineHeight:1.4}}>
                           {p.name}
                         </div>
-                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
-                          {info.domain&&<span style={{fontSize:9,color:'var(--blue)'}}>{info.domain}</span>}
-                          {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
+                          {info.sector&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
+                          {info.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {info.industry}</span>}
+                          {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
                           {brokerList.map((b,i)=>(
                             <span key={b} style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:BROKER_COLORS[brokers.indexOf(b)%BROKER_COLORS.length],border:'1px solid var(--border)'}}>{b}</span>
                           ))}
@@ -283,9 +285,10 @@ export default function Positions({ onEditTx }) {
                       <tr key={i}>
                         <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
                           <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
-                          <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
-                            {info.domain&&<span style={{fontSize:9,color:'var(--blue)'}}>{info.domain}</span>}
-                            {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[info.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                          <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
+                            {info.sector&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
+                            {info.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {info.industry}</span>}
+                            {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
                           </div>
                         </td>
                         <td><span style={{fontSize:11,color:'var(--text3)'}}>{p.broker}</span></td>
