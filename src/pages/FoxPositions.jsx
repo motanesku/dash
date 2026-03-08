@@ -1,88 +1,11 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
 import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
+import CompanyInfoSection, { SECTOR_ICONS as S_ICON, CAP_COLORS, SECTORS, CAPS } from '../components/CompanyInfoSection.jsx'
 
 const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
-const CAPS     = ['Large Cap','Mid Cap','Small Cap','Micro Cap']
-const SECTORS  = ['Tech','Finance','Health','Energy','Consumer','Industrial','Materials','Utilities','Real Estate','Telecom','Other']
-const S_ICON   = {'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍','Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','Other':'·'}
-const CAP_COLORS = {'Large Cap':'var(--blue)','Mid Cap':'var(--green)','Small Cap':'var(--gold)','Micro Cap':'var(--red)'}
 
-// ── Company info section (shared between modals) ──────────
-function CompanyInfoSection({ form, setForm, prices, companyInfo, fetchCompanyInfo }) {
-  const [loading, setLoading] = useState(false)
-  const debounce = useRef(null)
-  const set = k => e => setForm(f=>({...f,[k]:e.target.value}))
-
-  const applyInfo = (sym) => {
-    const info  = companyInfo[sym]
-    const pData = prices[sym]
-    setForm(f=>({
-      ...f,
-      name:   f.name   || pData?.name || '',
-      sector: f.sector || info?.sector || '',
-      cap:    f.cap    || info?.cap    || '',
-      domain: f.domain || info?.domain || info?.industry || '',
-    }))
-  }
-
-  useEffect(() => {
-    const sym = form.symbol?.toUpperCase().trim()
-    if (!sym) return
-    applyInfo(sym)
-    clearTimeout(debounce.current)
-    debounce.current = setTimeout(async () => {
-      if (!companyInfo[sym]?.sector) {
-        setLoading(true)
-        await fetchCompanyInfo([sym])
-        setLoading(false)
-      }
-    }, 700)
-  }, [form.symbol])
-
-  useEffect(() => {
-    const sym = form.symbol?.toUpperCase().trim()
-    if (sym) applyInfo(sym)
-  }, [companyInfo])
-
-  return (
-    <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
-      <div className="label" style={{marginBottom:10,color:'var(--blue)'}}>COMPANIE</div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:8,marginBottom:10}}>
-        <input className="input mono" placeholder="Symbol (ex: AAPL)" value={form.symbol||''}
-          onChange={e=>setForm(f=>({...f,symbol:e.target.value.toUpperCase()}))}/>
-        <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)',alignSelf:'center',minWidth:40}}>
-          {loading?'⟳ ...':''}
-        </span>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <div>
-          <div className="label" style={{marginBottom:4}}>Nume</div>
-          <input className="input" placeholder="Apple Inc." value={form.name||''} onChange={set('name')}/>
-        </div>
-        <div>
-          <div className="label" style={{marginBottom:4}}>Domeniu</div>
-          <input className="input" placeholder="Cloud Computing..." value={form.domain||''} onChange={set('domain')}/>
-        </div>
-        <div>
-          <div className="label" style={{marginBottom:4}}>Sector</div>
-          <select className="select" value={form.sector||''} onChange={set('sector')}>
-            <option value="">—</option>
-            {SECTORS.map(s=><option key={s} value={s}>{S_ICON[s]} {s}</option>)}
-          </select>
-        </div>
-        <div>
-          <div className="label" style={{marginBottom:4}}>Capitalizare</div>
-          <select className="select" value={form.cap||''} onChange={set('cap')}>
-            <option value="">—</option>
-            {CAPS.map(c=><option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── Modal: Poziție Deschisă ───────────────────────────────
 function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onClose }) {
@@ -279,7 +202,6 @@ export default function FoxPositions() {
   const [showOpenModal, setShowOpenModal] = useState(false)
   const [showClosedModal,setShowClosedModal] = useState(false)
   const [editItem,      setEditItem]      = useState(null)
-  const [filterSector,  setFilterSector]  = useState('ALL')
   const [view,          setView]          = useState('open')
 
   // Fetch company info for symbols not yet cached
@@ -308,8 +230,10 @@ export default function FoxPositions() {
       const inBuyZone  = cur!=null&&f.buyMin  ? cur<=f.buyMin  : false
       const inSellZone = cur!=null&&f.sellMin ? cur>=f.sellMin : false
       return {...f,
-        sector: f.sector||info.sector||'', cap: f.cap||info.cap||'',
-        domain: f.domain||info.domain||info.industry||'',
+        sector:   f.sector   || info.sector   || '',
+        cap:      f.cap      || info.cap      || '',
+        industry: f.industry || info.industry || '',
+        domain:   f.domain   || info.domain   || '',
         name:   f.name||prices[f.symbol]?.name||f.symbol,
         cur, cost, curVal, profit, roi, dayChg, pondere, inBuyZone, inSellZone,
       }
@@ -326,20 +250,18 @@ export default function FoxPositions() {
   const totalClosedRoi    = totalClosedCost>0 ? (totalClosedProfit/totalClosedCost)*100 : 0
 
   const filteredOpen = useMemo(()=>{
-    const arr = filterSector==='ALL' ? enrichedOpen : enrichedOpen.filter(f=>f.sector===filterSector)
-    return [...arr].sort((a,b)=>{
+    return [...enrichedOpen].sort((a,b)=>{
       if(sortBy==='pondere') return b.pondere-a.pondere
       if(sortBy==='profit')  return (b.profit||0)-(a.profit||0)
       if(sortBy==='roi')     return (b.roi||0)-(a.roi||0)
       if(sortBy==='symbol')  return a.symbol.localeCompare(b.symbol)
       return 0
     })
-  },[enrichedOpen, filterSector, sortBy])
+  },[enrichedOpen, sortBy])
 
   const filteredClosed = useMemo(()=>{
-    const arr = filterSector==='ALL' ? closedFox : closedFox.filter(f=>f.sector===filterSector)
-    return [...arr].sort((a,b)=>(b.profit||0)-(a.profit||0))
-  },[closedFox, filterSector])
+    return [...closedFox].sort((a,b)=>(b.profit||0)-(a.profit||0))
+  },[closedFox])
 
   const saveFox = (item) => {
     const next = editItem ? foxData.map(f=>f.id===editItem.id?item:f) : [...foxData,item]
@@ -348,7 +270,6 @@ export default function FoxPositions() {
   }
   const deleteFox = (id) => { if(confirm('Ștergi?')) setFoxData(foxData.filter(f=>f.id!==id)) }
 
-  const uniqueSectors = ['ALL',...new Set(foxData.map(f=>f.sector).filter(Boolean))]
   const SortBtn = ({val,label}) => (
     <button onClick={()=>setSortBy(val)} style={{
       padding:'3px 8px',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
@@ -380,27 +301,37 @@ export default function FoxPositions() {
         )}
       </div>
 
-      {/* Summary cards */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>
+      {/* Bannere profit nerealizat + realizat - mereu vizibile */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+        <div className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${totalOpenProfit>=0?'var(--green)':'var(--red)'}`}}>
+          <div className="label" style={{marginBottom:4,fontSize:9}}>PROFIT NEREALIZAT · FOX</div>
+          <div className={`mono ${pnlClass(totalOpenProfit)}`} style={{fontSize:'clamp(12px,3vw,18px)',fontWeight:700,whiteSpace:'nowrap'}}>{fmtC(totalOpenProfit)}</div>
+          <div className={`mono ${pnlClass(totalOpenRoi)}`} style={{fontSize:11}}>{fmtPct(totalOpenRoi)} · {openFox.length} poz.</div>
+        </div>
+        <div className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${totalClosedProfit>=0?'var(--purple)':'var(--red)'}`}}>
+          <div className="label" style={{marginBottom:4,fontSize:9}}>PROFIT REALIZAT · FOX</div>
+          <div className={`mono ${pnlClass(totalClosedProfit)}`} style={{fontSize:'clamp(12px,3vw,18px)',fontWeight:700,whiteSpace:'nowrap'}}>{fmtC(totalClosedProfit)}</div>
+          <div className={`mono ${pnlClass(totalClosedRoi)}`} style={{fontSize:11}}>{fmtPct(totalClosedRoi)} · {closedFox.length} poz.</div>
+        </div>
+      </div>
+
+      {/* Summary cards detaliu */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:16}}>
         {(view==='open'?[
-          {label:'Cost Total',   val:fmtC(totalOpenCost),   accent:'var(--text3)', v:null},
-          {label:'Valoare',      val:fmtC(totalOpenVal),    accent:'var(--blue)',  v:null},
-          {label:'Profit',       val:fmtC(totalOpenProfit), accent:totalOpenProfit>=0?'var(--green)':'var(--red)',  v:totalOpenProfit},
-          {label:'ROI',          val:fmtPct(totalOpenRoi),  accent:totalOpenRoi>=0?'var(--green)':'var(--red)',    v:totalOpenRoi},
+          {label:'Cost Total',val:fmtC(totalOpenCost),accent:'var(--text3)',v:null},
+          {label:'Valoare',val:fmtC(totalOpenVal),accent:'var(--blue)',v:null},
         ]:[
-          {label:'Cost Cumpărare', val:fmtC(totalClosedCost),   accent:'var(--text3)', v:null},
-          {label:'Profit Realizat',val:fmtC(totalClosedProfit), accent:totalClosedProfit>=0?'var(--green)':'var(--red)', v:totalClosedProfit},
-          {label:'ROI Mediu',      val:fmtPct(totalClosedRoi),  accent:totalClosedRoi>=0?'var(--green)':'var(--red)',   v:totalClosedRoi},
-          {label:'Poziții',        val:closedFox.length,         accent:'var(--purple)', v:null},
+          {label:'Cost Cumpărare',val:fmtC(totalClosedCost),accent:'var(--text3)',v:null},
+          {label:'Poziții Închise',val:closedFox.length,accent:'var(--purple)',v:null},
         ]).map(c=>(
-          <div key={c.label} className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${c.accent}`}}>
-            <div className="label" style={{marginBottom:6}}>{c.label}</div>
-            <div className={`mono ${c.v!=null?pnlClass(c.v):''}`} style={{fontSize:16,fontWeight:700}}>{c.val}</div>
+          <div key={c.label} className="card" style={{padding:'10px 14px',borderLeft:`2px solid ${c.accent}`}}>
+            <div className="label" style={{marginBottom:4,fontSize:9}}>{c.label}</div>
+            <div className={`mono ${c.v!=null?pnlClass(c.v):''}`} style={{fontSize:'clamp(11px,2.5vw,15px)',fontWeight:700}}>{c.val}</div>
           </div>
         ))}
       </div>
 
-      {/* Filters + toggle */}
+      {/* Toggle + sort */}
       <div style={{display:'flex',gap:6,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
         {[{id:'open',label:`▶ Deschise (${openFox.length})`},{id:'closed',label:`✓ Închise (${closedFox.length})`}].map(t=>(
           <button key={t.id} onClick={()=>setView(t.id)} style={{
@@ -408,13 +339,6 @@ export default function FoxPositions() {
             background:view===t.id?'var(--blue)':'var(--surface2)',
             color:view===t.id?'#fff':'var(--text3)',transition:'all .15s',
           }}>{t.label}</button>
-        ))}
-        {uniqueSectors.length>1&&uniqueSectors.map(s=>(
-          <button key={s} onClick={()=>setFilterSector(s)} style={{
-            padding:'3px 8px',borderRadius:4,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,
-            background:filterSector===s?'var(--purple)':'var(--surface2)',
-            color:filterSector===s?'#fff':'var(--text3)',transition:'all .15s',
-          }}>{s==='ALL'?'Toate':`${S_ICON[s]||''} ${s}`}</button>
         ))}
         {view==='open'&&<div style={{marginLeft:'auto',display:'flex',gap:5,alignItems:'center'}}>
           <span style={{fontSize:10,color:'var(--text3)',fontFamily:'var(--mono)'}}>SORT:</span>
@@ -468,9 +392,9 @@ export default function FoxPositions() {
                       <div style={{fontSize:10,color:'var(--text3)',whiteSpace:'normal',lineHeight:1.3}}>{f.name}</div>
                     </td>
                     <td style={{borderRight:'1px solid var(--border)'}}>
-                      <div style={{fontSize:11,color:'var(--blue)',fontWeight:500}}>{f.domain||'—'}</div>
-                      <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
-                        {f.sector&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                        {f.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                        {f.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {f.industry}</span>}
                         {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
                       </div>
                     </td>
@@ -559,9 +483,9 @@ export default function FoxPositions() {
                         {f.sellDate&&<div style={{fontSize:9,color:'var(--text3)',marginTop:2}}>{fmtDate(f.sellDate)}</div>}
                       </td>
                       <td style={{borderRight:'1px solid var(--border)'}}>
-                        <div style={{fontSize:11,color:'var(--blue)',fontWeight:500}}>{f.domain||'—'}</div>
-                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap'}}>
-                          {f.sector&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                          {f.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                          {f.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {f.industry}</span>}
                           {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
                         </div>
                       </td>
