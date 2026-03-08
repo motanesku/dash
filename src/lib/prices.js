@@ -123,16 +123,22 @@ export async function fetchFearGreed() {
   return null;
 }
 
+// Symbols shown as market cards (VIX excluded - shown in status bar instead)
 export const MARKET_SYMBOLS = [
   { sym: '^GSPC', label: 'S&P 500' },
   { sym: '^DJI', label: 'Dow Jones' },
   { sym: '^IXIC', label: 'Nasdaq' },
-  { sym: '^VIX', label: 'VIX' },
   { sym: 'GC=F', label: 'Gold' },
   { sym: 'CL=F', label: 'Oil' },
   { sym: 'BTC-USD', label: 'Bitcoin' },
   { sym: 'EURRON=X', label: 'EUR/RON' },
   { sym: 'RON=X', label: 'USD/RON' },
+];
+
+// All symbols to fetch (includes VIX for status bar)
+export const ALL_MARKET_SYMBOLS = [
+  ...MARKET_SYMBOLS,
+  { sym: '^VIX', label: 'VIX' },
 ];
 
 // ── Company Info (sector, cap, domain) ─────────────────────
