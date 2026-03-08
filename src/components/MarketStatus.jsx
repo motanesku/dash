@@ -22,9 +22,28 @@ function getMarketStatus() {
   return { status:'CLOSED', label:`U.S. MARKETS OPEN IN ${Math.floor(dm/60)}H ${dm%60}M`, color:'var(--text3)', dot:false }
 }
 
+function vixLabel(v) {
+  if (v == null) return ''
+  if (v < 15) return 'Low Fear'
+  if (v < 20) return 'Normal'
+  if (v < 30) return 'Elevated'
+  if (v < 40) return 'High Fear'
+  return 'Extreme Fear'
+}
+
+function vixColor(v) {
+  if (v == null) return 'var(--text3)'
+  if (v < 15) return 'var(--green)'
+  if (v < 20) return 'var(--text3)'
+  if (v < 30) return 'var(--gold)'
+  if (v < 40) return 'var(--red)'
+  return '#ff0055'
+}
+
 export default function MarketStatus() {
   const [st, setSt] = useState(getMarketStatus)
-  const fearGreed   = useStore(s => s.fearGreed)
+  const fearGreed = useStore(s => s.fearGreed)
+  const marketData = useStore(s => s.marketData)
 
   useEffect(() => {
     const id = setInterval(() => setSt(getMarketStatus()), 30000)
@@ -35,16 +54,21 @@ export default function MarketStatus() {
     ? fearGreed.value<=25?'var(--red)':fearGreed.value<=45?'var(--gold)':fearGreed.value<=55?'var(--text3)':fearGreed.value<=75?'var(--green)':'#00d4aa'
     : null
 
+  const vix = marketData?.['^VIX']?.price ?? null
+  const vc  = vixColor(vix)
+
+  const pillStyle = {
+    display:'flex', alignItems:'center', gap:8,
+    padding:'7px 14px', borderRadius:8,
+    background:'var(--surface2)', border:'1px solid var(--border)',
+    fontSize:11, fontFamily:'var(--mono)', fontWeight:600,
+    whiteSpace:'nowrap',
+  }
+
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14, flexWrap:'wrap' }}>
       {/* Market status pill */}
-      <div style={{
-        display:'flex', alignItems:'center', gap:8,
-        padding:'7px 14px', borderRadius:8,
-        background:'var(--surface2)', border:'1px solid var(--border)',
-        fontSize:11, fontFamily:'var(--mono)', fontWeight:600,
-        color: st.color, letterSpacing:.5,
-      }}>
+      <div style={{...pillStyle, color: st.color, border:`1px solid var(--border)`}}>
         {st.dot ? (
           <span style={{width:7,height:7,borderRadius:'50%',background:'var(--green)',boxShadow:'0 0 8px var(--green)',animation:'pulse 2s infinite',flexShrink:0}}/>
         ) : (
@@ -53,21 +77,23 @@ export default function MarketStatus() {
         {st.label}
       </div>
 
-      {/* Fear & Greed — right next to market status */}
+      {/* Crypto Fear & Greed */}
       {fearGreed && (
-        <div style={{
-          display:'flex', alignItems:'center', gap:8,
-          padding:'7px 14px', borderRadius:8,
-          background:'var(--surface2)', border:`1px solid ${fgColor}40`,
-          fontSize:11, fontFamily:'var(--mono)', fontWeight:600,
-        }}>
-          <span style={{fontSize:13}}>🧠</span>
-          <span style={{color:'var(--text3)'}}>Fear & Greed</span>
-          <span style={{
-            color:fgColor, fontSize:15, fontWeight:800,
-            fontFamily:'var(--mono)', lineHeight:1,
-          }}>{fearGreed.value}</span>
-          <span style={{color:fgColor, fontSize:9, letterSpacing:.5}}>{fearGreed.label}</span>
+        <div style={{...pillStyle, border:`1px solid ${fgColor}40`}}>
+          <span style={{fontSize:12}}>🧠</span>
+          <span style={{color:'var(--text3)'}}>Crypto F&G</span>
+          <span style={{color:fgColor, fontSize:15, fontWeight:800, lineHeight:1}}>{fearGreed.value}</span>
+          <span style={{color:fgColor, fontSize:9, letterSpacing:.5}}>{fearGreed.label?.toUpperCase()}</span>
+        </div>
+      )}
+
+      {/* VIX — Stock Fear */}
+      {vix != null && (
+        <div style={{...pillStyle, border:`1px solid ${vc}40`}}>
+          <span style={{fontSize:12}}>📊</span>
+          <span style={{color:'var(--text3)'}}>VIX</span>
+          <span style={{color:vc, fontSize:15, fontWeight:800, lineHeight:1}}>{vix.toFixed(1)}</span>
+          <span style={{color:vc, fontSize:9, letterSpacing:.5}}>{vixLabel(vix).toUpperCase()}</span>
         </div>
       )}
     </div>
