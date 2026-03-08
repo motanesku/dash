@@ -50,7 +50,7 @@ export default function Header({ onPinClick, onAddTx, onImport, onAlerts, onRefr
         )}
 
         {/* Alerts */}
-        <button className="btn btn-ghost btn-sm" onClick={onAlerts} style={{position:'relative',padding:'6px 8px'}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{ if(Notification.permission==='default') Notification.requestPermission(); onAlerts(); }} style={{position:'relative',padding:'6px 8px'}}>
           🔔
           {(untriggered > 0 || triggered > 0) && (
             <span style={{position:'absolute',top:2,right:2,width:7,height:7,borderRadius:'50%',background:triggered>0?'var(--red)':'var(--blue)'}}/>
