@@ -30,14 +30,13 @@ export default function App() {
     loadTxs()
     loadClubData()
     loadFoxData()
-    if (Notification.permission === 'default') Notification.requestPermission()
   }, [])
 
   useEffect(() => {
     if (txs.length) {
       fetchRef.current()
       // Fetch company info for all symbols
-      const syms = [...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol))]
+      const syms = [...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol||t.sym).filter(Boolean))]
       fetchCompanyInfo(syms)
     }
   }, [txs.map(t => t.symbol).join(',')])
