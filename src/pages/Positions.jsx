@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
 import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
+import CompanyEditModal from '../components/CompanyEditModal.jsx'
 import { CompanyInfoCard, SECTOR_ICONS, CAP_COLORS as CAP_COLORS_NEW, CAPS, SECTORS } from '../components/CompanyInfoSection.jsx'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
@@ -58,6 +59,7 @@ export default function Positions({ onEditTx }) {
 
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
+  const [editInfoSym, setEditInfoSym]   = useState(null)
   const [sortBy, setSortBy]           = useState('value')
   const [view, setView]               = useState('open')
 
@@ -219,7 +221,11 @@ export default function Positions({ onEditTx }) {
                     <tr key={p.symbol+(p.broker||'')} style={{cursor:'pointer'}}
                       onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
                       <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
+                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}
+                          onClick={e=>{e.stopPropagation();setEditInfoSym(p.symbol)}}>
+                          {p.symbol}
+                          <span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>
+                        </div>
                         <div style={{fontSize:10,color:'var(--text3)',marginTop:2,whiteSpace:'normal',lineHeight:1.4}}>
                           {p.name}
                         </div>
@@ -292,7 +298,10 @@ export default function Positions({ onEditTx }) {
                     return (
                       <tr key={i}>
                         <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)'}}>{p.symbol}</div>
+                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}
+                            onClick={e=>{e.stopPropagation();setEditInfoSym(p.symbol)}}>
+                            {p.symbol}<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>
+                          </div>
                           <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
                             {info.sector&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
                             {info.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {info.industry}</span>}
@@ -343,6 +352,7 @@ export default function Positions({ onEditTx }) {
           <PriceChart symbol={selectedPos.symbol} height={220}/>
         </div>
       )}
+      {editInfoSym && <CompanyEditModal symbol={editInfoSym} onClose={()=>setEditInfoSym(null)}/>}
     </div>
   )
 }
