@@ -93,13 +93,18 @@ export function calcPortfolio(txs, prices) {
   return { positions, closedPositions, cashByBroker };
 }
 
-export function aggregatePositions(positions) {
+export function aggregatePositions(positions, closedPositions = []) {
   const totalCostBasis  = positions.reduce((s,p) => s+p.costBasis, 0);
   const totalCurValue   = positions.reduce((s,p) => s+(p.curValue ?? 0), 0);
   const totalUnrealized = positions.reduce((s,p) => s+(p.unrealizedPnl ?? 0), 0);
-  const totalRealized   = positions.reduce((s,p) => s+p.realizedPnl, 0);
+  // Realized = partial sells on open positions + fully closed positions
+  const realizedFromOpen   = positions.reduce((s,p) => s+p.realizedPnl, 0);
+  const realizedFromClosed = closedPositions.reduce((s,p) => s+p.totalProfit, 0);
+  const totalRealized = realizedFromOpen + realizedFromClosed;
+  const totalRealizedCost = positions.reduce((s,p) => s+p.costBasis, 0) +
+    closedPositions.reduce((s,p) => s+p.totalCost, 0);
   const uPct = totalCostBasis > 0 ? (totalUnrealized/totalCostBasis)*100 : 0;
-  const rPct = totalCostBasis > 0 ? (totalRealized  /totalCostBasis)*100 : 0;
+  const rPct = totalRealizedCost > 0 ? (totalRealized/totalRealizedCost)*100 : 0;
   return { totalCostBasis, totalCurValue, totalUnrealized, totalRealized, uPct, rPct };
 }
 
