@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
 import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
@@ -46,7 +46,15 @@ export default function Positions({ onEditTx }) {
   const setBrokerTab = useStore(s => s.setBrokerTab)
   const brokers      = useStore(s => s.brokers)
   const isAdmin      = useStore(s => s.isAdmin)
-  const companyInfo  = useStore(s => s.companyInfo)
+  const companyInfo       = useStore(s => s.companyInfo)
+  const fetchCompanyInfo  = useStore(s => s.fetchCompanyInfo)
+
+  // Auto-fetch company info for all symbols not yet cached
+  useEffect(() => {
+    const allSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol || t.sym).filter(Boolean))]
+    const missing = allSyms.filter(s => !companyInfo[s]?.sector)
+    if (missing.length) fetchCompanyInfo(missing)
+  }, [txs.length])
 
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
