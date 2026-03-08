@@ -108,10 +108,11 @@ const useStore = create((set, get) => ({
   pricesUpdated: null,
 
   fetchAllPrices: async () => {
-    const { txs } = get();
+    const { txs, foxData } = get();
     const portfolioSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol || t.sym).filter(Boolean))];
+    const foxSyms = [...new Set(foxData.map(f => f.symbol).filter(Boolean))];
     const marketSyms = ALL_MARKET_SYMBOLS.map(s => s.sym);
-    const allSyms = [...new Set([...portfolioSyms, ...marketSyms])];
+    const allSyms = [...new Set([...portfolioSyms, ...foxSyms, ...marketSyms])];
     if (!allSyms.length) return;
 
     set({ pricesLoading: true });
@@ -126,6 +127,7 @@ const useStore = create((set, get) => ({
       const prices = {};
       const marketData = {};
       portfolioSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
+      foxSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       marketSyms.forEach(s => { if (allPrices[s]) marketData[s] = allPrices[s]; });
       set({ prices, marketData, pricesLoading: false, pricesUpdated: new Date() });
       // Cache for next visit
