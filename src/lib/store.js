@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchPrices, fetchFearGreed, MARKET_SYMBOLS } from './prices.js';
+import { fetchPrices, fetchFearGreed, MARKET_SYMBOLS, ALL_MARKET_SYMBOLS } from './prices.js';
 import { calcPortfolio } from './portfolio.js';
 import { loadTransactions, saveTransactionsLocal, syncTransactionsToCloud, loadBrokers, saveBrokers, loadAlerts, saveAlerts, loadClub, saveClub } from './sheets.js';
 
@@ -57,16 +57,21 @@ const useStore = create((set, get) => ({
 
   // ── Transactions ────────────────────────────────────────
   // Start with cached txs immediately — page renders instantly
-  txs: readCache('ptf_v6_local') || [],
+  txs: readCache('ptf_v6_txs') || readCache('ptf_v6_local') || [],
   cloudLoading: false,
   cloudErr: null,
 
   loadTxs: async () => {
+    // Show localStorage immediately (already set on init)
     set({ cloudLoading: true, cloudErr: null });
     try {
       const txs = await loadTransactions();
-      set({ txs, cloudLoading: false });
-      saveTransactionsLocal(txs);
+      if (txs && txs.length > 0) {
+        set({ txs, cloudLoading: false });
+        saveTransactionsLocal(txs);
+      } else {
+        set({ cloudLoading: false });
+      }
     } catch (e) {
       set({ cloudLoading: false, cloudErr: e.message });
     }
@@ -105,7 +110,7 @@ const useStore = create((set, get) => ({
   fetchAllPrices: async () => {
     const { txs } = get();
     const portfolioSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol || t.sym).filter(Boolean))];
-    const marketSyms = MARKET_SYMBOLS.map(s => s.sym);
+    const marketSyms = ALL_MARKET_SYMBOLS.map(s => s.sym);
     const allSyms = [...new Set([...portfolioSyms, ...marketSyms])];
     if (!allSyms.length) return;
 
@@ -141,9 +146,24 @@ const useStore = create((set, get) => ({
   club: { name: 'Investment Club', totalValue: 0, investors: [], contributions: [] },
   clubLoaded: false,
   loadClub: async () => {
-    const club = await loadClub();
-    if (club) set({ club, clubLoaded: true });
-    else set({ clubLoaded: true });
+    // Show cached club immediately from localStorage
+    try {
+      const cached = localStorage.getItem('ptf_v6_club');
+      if (cached) {
+        const club = JSON.parse(cached);
+        set({ club, clubLoaded: true });
+      }
+    } catch {}
+    // Then update from cloud silently
+    try {
+      const club = await loadClub();
+      if (club) {
+        set({ club, clubLoaded: true });
+        try { localStorage.setItem('ptf_v6_club', JSON.stringify(club)); } catch {}
+      } else {
+        set({ clubLoaded: true });
+      }
+    } catch { set({ clubLoaded: true }); }
   },
   updateClub: async (club) => {
     set({ club });
