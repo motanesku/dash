@@ -49,6 +49,7 @@ export default function Positions({ onEditTx }) {
   const isAdmin      = useStore(s => s.isAdmin)
   const companyInfo       = useStore(s => s.companyInfo)
   const fetchCompanyInfo  = useStore(s => s.fetchCompanyInfo)
+  const isAdmin           = useStore(s => s.isAdmin)
 
   // Auto-fetch company info for all symbols not yet cached
   useEffect(() => {
@@ -150,12 +151,18 @@ export default function Positions({ onEditTx }) {
       {/* Broker tabs */}
       <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4}}>
         <button onClick={()=>setBrokerTab(null)} style={{
-          padding:'8px 16px',borderRadius:8,
+          display:'flex',alignItems:'center',gap:6,padding:'8px 16px',borderRadius:8,
           border:`2px solid ${!brokerTab?'var(--blue)':'var(--border2)'}`,
           background:!brokerTab?'var(--blue-bg)':'var(--surface)',
           color:!brokerTab?'var(--blue)':'var(--text3)',
           fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
-        }}>TOTAL · {[...new Set(positions.map(p=>p.symbol))].length} simboluri</button>
+        }}>
+          TOTAL
+          {totalCost>0 && <span className="mono" style={{fontSize:10,fontWeight:700,color:!brokerTab?'inherit':totalUnrealized>=0?'var(--green)':'var(--red)'}}>
+            {totalUnrealized>=0?'+':''}{(totalUnrealized/totalCost*100).toFixed(1)}%
+          </span>}
+          <span className="mono" style={{fontSize:10,color:!brokerTab?'inherit':'var(--text3)'}}>{[...new Set(positions.map(p=>p.symbol))].length}</span>
+        </button>
         {brokers.map((b,i) => {
           const st = brokerStats[b]
           const active = brokerTab === b
@@ -208,6 +215,7 @@ export default function Positions({ onEditTx }) {
             <table className="data-table" style={{minWidth:620}}>
               <thead><tr>
                 <th style={STICKY_H}>Symbol</th>
+                <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
                 <th>Acțiuni · Avg</th>
                 <th>Preț · Δ azi</th>
                 <th style={{textAlign:'right'}}>Nerealizat · %</th>
@@ -220,23 +228,27 @@ export default function Positions({ onEditTx }) {
                   return (
                     <tr key={p.symbol+(p.broker||'')} style={{cursor:'pointer'}}
                       onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
-                      <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}
-                          onClick={e=>{e.stopPropagation();setEditInfoSym(p.symbol)}}>
+                      <td style={{...STICKY, borderRight:'1px solid var(--border)', minWidth:110, maxWidth:140}}>
+                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:isAdmin?'pointer':'default',display:'inline-flex',alignItems:'center',gap:4}}
+                          onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
                           {p.symbol}
-                          <span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>
+                          {isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>}
                         </div>
-                        <div style={{fontSize:10,color:'var(--text3)',marginTop:2,whiteSpace:'normal',lineHeight:1.4}}>
+                        <div style={{fontSize:10,color:'var(--text3)',marginTop:2,lineHeight:1.3,whiteSpace:'normal'}}>
                           {p.name}
                         </div>
-                        <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
-                          {info.sector&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
-                          {info.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {info.industry}</span>}
-                          {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                        <div style={{display:'flex',gap:3,marginTop:3,flexWrap:'wrap'}}>
                           {brokerList.map((b,i)=>(
                             <span key={b} style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:BROKER_COLORS[brokers.indexOf(b)%BROKER_COLORS.length],border:'1px solid var(--border)'}}>{b}</span>
                           ))}
                         </div>
+                      </td>
+                      <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                          {info.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
+                          {info.industry&&<span style={{fontSize:10,color:'var(--text3)'}}>· {info.industry}</span>}
+                        </div>
+                        {info.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                       </td>
                       <td>
                         <div className="mono" style={{fontSize:12}}>{p.shares.toFixed(4)}</div>
@@ -286,8 +298,8 @@ export default function Positions({ onEditTx }) {
               <table className="data-table" style={{minWidth:580}}>
                 <thead><tr>
                   <th style={STICKY_H}>Symbol</th>
+                  <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
                   <th>Broker</th>
-                  <th style={{textAlign:'right'}}>Acțiuni</th>
                   <th style={{textAlign:'right'}}>Profit Realizat</th>
                   <th style={{textAlign:'right'}}>ROI</th>
                   <th style={{textAlign:'right'}} className="hide-mobile">Ultima vânzare</th>
@@ -297,16 +309,18 @@ export default function Positions({ onEditTx }) {
                     const info = companyInfo[p.symbol] || {}
                     return (
                       <tr key={i}>
-                        <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}
-                            onClick={e=>{e.stopPropagation();setEditInfoSym(p.symbol)}}>
-                            {p.symbol}<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>
+                        <td style={{...STICKY, borderRight:'1px solid var(--border)', minWidth:110, maxWidth:140}}>
+                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:isAdmin?'pointer':'default',display:'inline-flex',alignItems:'center',gap:4}}
+                            onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
+                            {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>}
                           </div>
-                          <div style={{display:'flex',gap:4,marginTop:3,flexWrap:'wrap',alignItems:'center'}}>
-                            {info.sector&&<span style={{fontSize:9,color:'var(--blue)'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
-                            {info.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {info.industry}</span>}
-                            {info.cap&&<span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`}}>{info.cap}</span>}
+                        </td>
+                        <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
+                          <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                            {info.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
+                            {info.industry&&<span style={{fontSize:10,color:'var(--text3)'}}>· {info.industry}</span>}
                           </div>
+                          {info.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                         </td>
                         <td><span style={{fontSize:11,color:'var(--text3)'}}>{p.broker}</span></td>
                         <td style={{textAlign:'right'}}><span className="mono" style={{fontSize:12}}>{p.totalShares?.toFixed(4)||'—'}</span></td>
@@ -325,7 +339,7 @@ export default function Positions({ onEditTx }) {
                 </tbody>
                 <tfoot>
                   <tr className="total-row">
-                    <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
+                    <td colSpan={4} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
                     <td style={{textAlign:'right'}}>
                       <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
                         {fmtC(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}
