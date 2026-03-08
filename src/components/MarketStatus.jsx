@@ -81,7 +81,7 @@ export default function MarketStatus() {
       {fearGreed && (
         <div style={{...pillStyle, border:`1px solid ${fgColor}40`}}>
           <span style={{fontSize:12}}>🧠</span>
-          <span style={{color:'var(--text3)'}}>Crypto F&G</span>
+          <span style={{color:'var(--text3)'}}>Crypto Fear & Greed</span>
           <span style={{color:fgColor, fontSize:15, fontWeight:800, lineHeight:1}}>{fearGreed.value}</span>
           <span style={{color:fgColor, fontSize:9, letterSpacing:.5}}>{fearGreed.label?.toUpperCase()}</span>
         </div>
