@@ -294,11 +294,11 @@ export default function Positions({ onEditTx }) {
             </div>
           ) : (
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <table className="data-table" style={{minWidth:580}}>
+              <table className="data-table" style={{minWidth:680}}>
                 <thead><tr>
                   <th style={STICKY_H}>Symbol</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
-                  <th>Broker</th>
+                  <th>Acțiuni</th>
                   <th style={{textAlign:'right'}}>Profit Realizat</th>
                   <th style={{textAlign:'right'}}>ROI</th>
                   <th style={{textAlign:'right'}} className="hide-mobile">Ultima vânzare</th>
@@ -313,6 +313,10 @@ export default function Positions({ onEditTx }) {
                             onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
                             {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>}
                           </div>
+                          <div style={{fontSize:10,color:'var(--text3)',marginTop:2,lineHeight:1.3}}>{p.name||''}</div>
+                          <div style={{display:'flex',gap:3,marginTop:3,flexWrap:'wrap'}}>
+                            <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{p.broker}</span>
+                          </div>
                         </td>
                         <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
                           <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
@@ -321,8 +325,9 @@ export default function Positions({ onEditTx }) {
                           </div>
                           {info.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                         </td>
-                        <td><span style={{fontSize:11,color:'var(--text3)'}}>{p.broker}</span></td>
-                        <td style={{textAlign:'right'}}><span className="mono" style={{fontSize:12}}>{p.totalShares?.toFixed(4)||'—'}</span></td>
+                        <td>
+                          <div className="mono" style={{fontSize:12}}>{p.totalShares?.toFixed(4)||'—'}</div>
+                        </td>
                         <td style={{textAlign:'right'}}>
                           <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:13,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
                         </td>
@@ -338,7 +343,7 @@ export default function Positions({ onEditTx }) {
                 </tbody>
                 <tfoot>
                   <tr className="total-row">
-                    <td colSpan={4} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
+                    <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
                     <td style={{textAlign:'right'}}>
                       <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
                         {fmtC(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}
