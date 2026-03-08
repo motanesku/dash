@@ -93,11 +93,24 @@ function StatCard({label,value,sub,subClass,accent,delay=0}) {
 
 // ── Sector Pie Chart ──────────────────────────────────────────
 const SECTOR_COLORS = {
-  'Tech':'#58a6ff','Finance':'#00d4aa','Health':'#a78bfa','Energy':'#f0b429',
-  'Consumer':'#ff5572','Industrial':'#34d399','Materials':'#fb923c',
-  'Utilities':'#60a5fa','Real Estate':'#f472b6','Telecom':'#a3e635','Other':'#6b7280','—':'#374151'
+  // GICS standard
+  'Technology':'#58a6ff','Healthcare':'#a78bfa','Financials':'#00d4aa',
+  'Energy':'#f0b429','Consumer Discretionary':'#ff5572','Consumer Staples':'#fb7185',
+  'Industrials':'#34d399','Materials':'#fb923c','Utilities':'#60a5fa',
+  'Real Estate':'#f472b6','Communication Services':'#a3e635',
+  // legacy
+  'Tech':'#58a6ff','Finance':'#00d4aa','Health':'#a78bfa',
+  'Consumer':'#ff5572','Industrial':'#34d399','Telecom':'#a3e635',
+  'Other':'#6b7280','—':'#374151',
 }
-const S_ICON = {'Tech':'💻','Finance':'🏦','Health':'🏥','Energy':'⚡','Consumer':'🛍','Industrial':'🏭','Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Telecom':'📡','Other':'·','—':'·'}
+const S_ICON = {
+  'Technology':'💻','Healthcare':'🏥','Financials':'🏦','Energy':'⚡',
+  'Consumer Discretionary':'🛍','Consumer Staples':'🛒','Industrials':'🏭',
+  'Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Communication Services':'📡',
+  // legacy
+  'Tech':'💻','Finance':'🏦','Health':'🏥','Consumer':'🛍',
+  'Industrial':'🏭','Telecom':'📡','Other':'·','—':'·',
+}
 
 function SectorPieChart({ positions, companyInfo }) {
   const [hovered, setHovered] = useState(null)
