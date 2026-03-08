@@ -204,7 +204,7 @@ export default function Club() {
           <div style={{overflowX:'auto'}}>
             <table className="data-table" style={{minWidth:400}}>
               <thead><tr>
-                <th style={STICKY_H}>Lună</th>
+                <th style={{...STICKY_H, minWidth:80}}>Lună</th>
                 {stats.map(inv=><th key={inv.id} style={{textAlign:'right',color:inv.color}}>{inv.name}</th>)}
                 <th style={{textAlign:'right'}}>Total</th>
                 {isAdmin&&<th/>}
@@ -214,7 +214,7 @@ export default function Club() {
                   const monthTotal = club.contributions.filter(c=>c.month===month).reduce((s,c)=>s+c.amount,0)
                   return (
                     <tr key={month}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{month}</td>
+                      <td style={{...STICKY, fontFamily:'var(--mono)',fontSize:12,fontWeight:600,borderRight:'1px solid var(--border)'}}>{month}</td>
                       {stats.map(inv=>{
                         const c = club.contributions.find(x=>x.investorId===inv.id&&x.month===month)
                         return (
