@@ -347,8 +347,8 @@ export default function Dashboard() {
   const isFirstLoad=cloudLoading&&!hasCachedData
   const [chartTab,setChartTab]=useState('perf')
 
-  const {positions,cashByBroker}=useMemo(()=>calcPortfolio(txs,prices),[txs,prices])
-  const agg=useMemo(()=>aggregatePositions(positions),[positions])
+  const {positions,closedPositions,cashByBroker}=useMemo(()=>calcPortfolio(txs,prices),[txs,prices])
+  const agg=useMemo(()=>aggregatePositions(positions,closedPositions),[positions,closedPositions])
   const cashTotal=Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const totalWithCash=agg.totalCurValue+cashTotal
   const cashPct=totalWithCash>0?(cashTotal/totalWithCash)*100:0
