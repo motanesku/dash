@@ -49,7 +49,6 @@ export default function Positions({ onEditTx }) {
   const isAdmin      = useStore(s => s.isAdmin)
   const companyInfo       = useStore(s => s.companyInfo)
   const fetchCompanyInfo  = useStore(s => s.fetchCompanyInfo)
-  const isAdmin           = useStore(s => s.isAdmin)
 
   // Auto-fetch company info for all symbols not yet cached
   useEffect(() => {
