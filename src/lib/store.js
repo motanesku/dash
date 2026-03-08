@@ -175,6 +175,34 @@ const useStore = create((set, get) => ({
   // ── Company Info (sector, cap, domain) ─────────────────────
   companyInfo: (() => { try { const s=localStorage.getItem('ptf_v6_compinfo'); return s?JSON.parse(s):{}; } catch{return {};} })(),
 
+  setCompanyInfo: (symbol, data) => {
+    const merged = { ...get().companyInfo, [symbol]: { ...(get().companyInfo[symbol]||{}), ...data } };
+    set({ companyInfo: merged });
+    try { localStorage.setItem('ptf_v6_compinfo', JSON.stringify(merged)); } catch {}
+    // Sync to cloud
+    import('../config.js').then(({ SHEETS_URL, USE_CLOUD }) => {
+      if (!USE_CLOUD) return;
+      fetch(SHEETS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'saveCompanyInfo', data: merged }),
+      }).catch(() => {});
+    });
+  },
+
+  loadCompanyInfo: async () => {
+    try {
+      const { SHEETS_URL, USE_CLOUD } = await import('../config.js');
+      if (!USE_CLOUD) return;
+      const r = await fetch(`${SHEETS_URL}?action=getCompanyInfo`);
+      const j = await r.json();
+      if (j.ok && j.data && Object.keys(j.data).length) {
+        const merged = { ...get().companyInfo, ...j.data };
+        set({ companyInfo: merged });
+        try { localStorage.setItem('ptf_v6_compinfo', JSON.stringify(merged)); } catch {}
+      }
+    } catch {}
+  },
+
   fetchCompanyInfo: async (symbols) => {
     if (!symbols.length) return;
     try {
