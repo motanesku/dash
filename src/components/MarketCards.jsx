@@ -138,7 +138,11 @@ function Card({ sym, label, decimals = 2, prices }) {
   const price    = pd?.price
   const change   = pd?.change
   const changePct= pd?.changePct
-  const positive = (changePct ?? 0) >= 0
+  // Culoare bazată pe sparkline (primul vs ultimul punct) sau pe changePct
+  const sparkPositive = points.length >= 2
+    ? points[points.length - 1].close >= points[0].close
+    : (changePct ?? 0) >= 0
+  const positive = sparkPositive
 
   const color  = positive ? '#26a69a' : '#ef5350'
   const pctStr = changePct != null
@@ -153,6 +157,9 @@ function Card({ sym, label, decimals = 2, prices }) {
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
+      minWidth: 160,
+      width: 160,
+      flexShrink: 0,
     }}>
       {/* Header */}
       <div style={{ padding: '10px 12px 4px' }}>
@@ -210,11 +217,14 @@ export default function MarketCards({ prices }) {
         ))}
       </div>
 
-      {/* Grid 2 coloane */}
+      {/* Scroll orizontal — carduri fixe */}
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
+        display: 'flex',
         gap: 8,
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        paddingBottom: 4,
       }}>
         {syms.map(({ sym, label, decimals }) => (
           <Card key={sym} sym={sym} label={label} decimals={decimals} prices={prices}/>
