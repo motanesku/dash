@@ -124,7 +124,11 @@ async function fetchQuote(sym) {
   try {
     const r = await fetch(`${WORKER_URL}/api/prices?symbols=${encodeURIComponent(sym)}`)
     const d = await r.json()
-    return d?.[sym] || null
+    const p = d?.prices?.[sym]
+    if (!p) return null
+    const change    = p.prev ? p.price - p.prev : null
+    const changePct = p.prev ? ((p.price - p.prev) / p.prev) * 100 : null
+    return { ...p, change, changePct }
   } catch { return null }
 }
 
