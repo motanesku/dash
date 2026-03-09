@@ -121,7 +121,11 @@ const useStore = create((set, get) => ({
       const [allPrices] = await Promise.all([
         fetchPrices(allSyms),
         fetchFearGreed().then(fg => {
-          if (fg) { set({ fearGreed: fg }); writeCache(FEARGREED_CACHE_KEY, fg); }
+          if (fg) {
+            // support both old format (value) and new format (crypto + stock)
+            set({ fearGreed: fg });
+            writeCache(FEARGREED_CACHE_KEY, fg);
+          }
         }),
       ]);
       const prices = {};
@@ -193,6 +197,25 @@ const useStore = create((set, get) => ({
     try {
       const { SHEETS_URL, USE_CLOUD } = await import('../config.js');
       if (!USE_CLOUD) return;
+      // Dacă avem deja date în localStorage, nu mai bate Sheets la fiecare load
+      // Sync în background doar dacă localStorage e gol
+      const existing = get().companyInfo;
+      if (Object.keys(existing).length > 0) {
+        // Sync silențios în background după 5 secunde
+        setTimeout(async () => {
+          try {
+            const r = await fetch(`${SHEETS_URL}?action=getCompanyInfo`);
+            const j = await r.json();
+            if (j.ok && j.data && Object.keys(j.data).length) {
+              const merged = { ...get().companyInfo, ...j.data };
+              set({ companyInfo: merged });
+              try { localStorage.setItem('ptf_v6_compinfo', JSON.stringify(merged)); } catch {}
+            }
+          } catch {}
+        }, 5000);
+        return;
+      }
+      // Prima oară — fetch imediat
       const r = await fetch(`${SHEETS_URL}?action=getCompanyInfo`);
       const j = await r.json();
       if (j.ok && j.data && Object.keys(j.data).length) {
@@ -294,3 +317,4 @@ const useStore = create((set, get) => ({
 }));
 
 export default useStore;
+
