@@ -318,7 +318,7 @@ export default function Positions({ onEditTx }) {
                             <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{p.broker}</span>
                           </div>
                         </td>
-                        <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
+                        <td style={{borderRight:'1px solid var(--border2)', minWidth:90}}>
                           <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
                             {info.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
                             {info.industry&&<span style={{fontSize:10,color:'var(--text3)'}}>· {info.industry}</span>}
