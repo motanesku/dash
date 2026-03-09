@@ -50,9 +50,9 @@ export default function MarketStatus() {
     return () => clearInterval(id)
   }, [])
 
-  const fgColor = fearGreed
-    ? fearGreed.value<=25?'var(--red)':fearGreed.value<=45?'var(--gold)':fearGreed.value<=55?'var(--text3)':fearGreed.value<=75?'var(--green)':'#00d4aa'
-    : null
+  const fgCryptoVal = fearGreed?.crypto?.value ?? fearGreed?.value ?? null
+  const fgStockVal  = fearGreed?.stock?.value ?? null
+  const fgColor = v => v==null?'var(--text3)':v<=25?'var(--red)':v<=45?'var(--gold)':v<=55?'var(--text3)':v<=75?'var(--green)':'#00d4aa'
 
   const vix = marketData?.['^VIX']?.price ?? null
   const vc  = vixColor(vix)
@@ -79,7 +79,7 @@ export default function MarketStatus() {
 
       {/* Crypto Fear & Greed */}
       {(fgCryptoVal!=null||fgStockVal!=null) && (
-        <div style={{...pillStyle, border:`1px solid ${fgColor}40`}}>
+        <div style={{...pillStyle, border:`1px solid ${fgColor(fgStockVal??fgCryptoVal)}40`}}>
           <span style={{fontSize:12}}>🧠</span>
           <span style={{color:'var(--text3)'}}>Crypto F&G</span>
           {fgStockVal!=null&&<>
