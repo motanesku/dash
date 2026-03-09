@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
+import MarketCards from '../components/MarketCards.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 import MarketStatus from '../components/MarketStatus.jsx'
@@ -386,8 +387,8 @@ export default function Dashboard() {
       )}
 
       <MarketStatus/>
-      <MarketTicker/>
       <FearGreedBanner fearGreed={fearGreed} vix={vix}/>
+      <MarketCards prices={{...prices,...marketData}}/>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20}}>
         <StatCard delay={1} label="Valoare Totală" value={fmtC(agg.totalCurValue)} sub={`${positions.length} poziții`} accent="var(--blue)"/>
