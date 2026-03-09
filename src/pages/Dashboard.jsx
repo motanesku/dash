@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
+import FearGreedGauge from '../components/FearGreedGauge.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 import MarketStatus from '../components/MarketStatus.jsx'
@@ -353,6 +354,7 @@ function SkeletonCard() {
 export default function Dashboard() {
   const txs=useStore(s=>s.txs)
   const prices=useStore(s=>s.prices)
+  const fearGreed=useStore(s=>s.fearGreed)
   const companyInfo=useStore(s=>s.companyInfo)
   const cloudLoading=useStore(s=>s.cloudLoading)
   const pricesLoading=useStore(s=>s.pricesLoading)
@@ -371,6 +373,7 @@ export default function Dashboard() {
     {id:'alloc',label:'▦ Alocare'},
     {id:'monthly',label:'📊 Lunar'},
     {id:'sectors',label:'🥧 Sectoare'},
+    {id:'fg',label:'😨 Fear & Greed'},
   ]
 
   return(
@@ -408,6 +411,7 @@ export default function Dashboard() {
           {chartTab==='alloc'   && <AllocChart positions={positions}/>}
           {chartTab==='monthly' && <MonthlyChart txs={txs} prices={prices}/>}
           {chartTab==='sectors' && <SectorPieChart positions={positions} companyInfo={companyInfo}/>}
+          {chartTab==='fg'      && <FearGreedGauge fearGreed={fearGreed}/>}
         </div>
       )}
 
