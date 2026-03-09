@@ -77,32 +77,7 @@ export default function MarketStatus() {
         {st.label}
       </div>
 
-      {/* Crypto Fear & Greed */}
-      {(fgCryptoVal!=null||fgStockVal!=null) && (
-        <div style={{...pillStyle, border:`1px solid ${fgColor(fgStockVal??fgCryptoVal)}40`}}>
-          <span style={{fontSize:12}}>🧠</span>
-          <span style={{color:'var(--text3)'}}>Crypto F&G</span>
-          {fgStockVal!=null&&<>
-            <span style={{color:fgColor(fgStockVal), fontSize:13, fontWeight:800, lineHeight:1}}>{fgStockVal}</span>
-            <span style={{color:fgColor(fgStockVal), fontSize:8, letterSpacing:.5}}>STOCKS</span>
-          </>}
-          {fgStockVal!=null&&fgCryptoVal!=null&&<span style={{color:'var(--border2)',fontSize:10}}>·</span>}
-          {fgCryptoVal!=null&&<>
-            <span style={{color:fgColor(fgCryptoVal), fontSize:13, fontWeight:800, lineHeight:1}}>{fgCryptoVal}</span>
-            <span style={{color:fgColor(fgCryptoVal), fontSize:8, letterSpacing:.5}}>CRYPTO</span>
-          </>}
-        </div>
-      )}
 
-      {/* VIX — Stock Fear */}
-      {vix != null && (
-        <div style={{...pillStyle, border:`1px solid ${vc}40`}}>
-          <span style={{fontSize:12}}>📊</span>
-          <span style={{color:'var(--text3)'}}>VIX</span>
-          <span style={{color:vc, fontSize:15, fontWeight:800, lineHeight:1}}>{vix.toFixed(1)}</span>
-          <span style={{color:vc, fontSize:9, letterSpacing:.5}}>{vixLabel(vix).toUpperCase()}</span>
-        </div>
-      )}
     </div>
   )
 }
