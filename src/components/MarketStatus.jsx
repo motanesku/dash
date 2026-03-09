@@ -78,12 +78,19 @@ export default function MarketStatus() {
       </div>
 
       {/* Crypto Fear & Greed */}
-      {fearGreed && (
+      {(fgCryptoVal!=null||fgStockVal!=null) && (
         <div style={{...pillStyle, border:`1px solid ${fgColor}40`}}>
           <span style={{fontSize:12}}>🧠</span>
-          <span style={{color:'var(--text3)'}}>Crypto Fear & Greed</span>
-          <span style={{color:fgColor, fontSize:15, fontWeight:800, lineHeight:1}}>{fearGreed.value}</span>
-          <span style={{color:fgColor, fontSize:9, letterSpacing:.5}}>{fearGreed.label?.toUpperCase()}</span>
+          <span style={{color:'var(--text3)'}}>Crypto F&G</span>
+          {fgStockVal!=null&&<>
+            <span style={{color:fgColor(fgStockVal), fontSize:13, fontWeight:800, lineHeight:1}}>{fgStockVal}</span>
+            <span style={{color:fgColor(fgStockVal), fontSize:8, letterSpacing:.5}}>STOCKS</span>
+          </>}
+          {fgStockVal!=null&&fgCryptoVal!=null&&<span style={{color:'var(--border2)',fontSize:10}}>·</span>}
+          {fgCryptoVal!=null&&<>
+            <span style={{color:fgColor(fgCryptoVal), fontSize:13, fontWeight:800, lineHeight:1}}>{fgCryptoVal}</span>
+            <span style={{color:fgColor(fgCryptoVal), fontSize:8, letterSpacing:.5}}>CRYPTO</span>
+          </>}
         </div>
       )}
 
