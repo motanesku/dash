@@ -1,5 +1,3 @@
-// Banner cu Fear & Greed (Stocks CNN + Crypto) + VIX sub MarketStatus
-
 const ZONES = [
   { min:0,  max:25,  label:'Extreme Fear', color:'#ff2d55' },
   { min:25, max:45,  label:'Fear',         color:'#ff6b35' },
@@ -13,154 +11,104 @@ function getColor(v) {
   return ZONES.find(z => v >= z.min && v <= z.max)?.color || 'var(--text3)'
 }
 function getLabel(v) {
-  if (v == null) return '—'
-  return ZONES.find(z => v >= z.min && v <= z.max)?.label || '—'
+  if (v == null) return null
+  return ZONES.find(z => v >= z.min && v <= z.max)?.label || null
 }
 
-// Bara colorată orizontală cu indicator
-function FGBar({ value }) {
-  if (value == null) return <div style={{height:4,borderRadius:2,background:'var(--border)',width:'100%'}}/>
-  const color = getColor(value)
+function FGBar({ value, maxVal=100 }) {
+  const pct = value != null ? Math.min((value / maxVal) * 100, 100) : null
+  const color = maxVal === 100 ? getColor(value) : (() => {
+    // VIX color
+    if (value == null) return 'var(--text3)'
+    if (value <= 15) return '#00d4aa'
+    if (value <= 20) return '#34d399'
+    if (value <= 25) return '#f0b429'
+    if (value <= 30) return '#ff6b35'
+    return '#ff2d55'
+  })()
+
+  const gradient = maxVal === 100
+    ? 'linear-gradient(to right, #ff2d55 0%, #ff6b35 25%, #f0b429 45%, #34d399 55%, #00d4aa 100%)'
+    : 'linear-gradient(to right, #00d4aa 0%, #34d399 30%, #f0b429 50%, #ff6b35 70%, #ff2d55 100%)'
+
+  if (pct == null) return (
+    <div style={{height:5,borderRadius:3,background:'var(--border)',width:'100%',marginTop:6}}/>
+  )
+
   return (
-    <div style={{position:'relative',height:4,borderRadius:2,
-      background:'linear-gradient(to right, #ff2d55 0%, #ff6b35 25%, #f0b429 45%, #34d399 55%, #00d4aa 100%)',
-      width:'100%', opacity:0.35}}>
-      {/* Overlay gri peste zona neatingată */}
-      <div style={{position:'absolute',left:`${value}%`,right:0,top:0,bottom:0,
-        background:'var(--surface)',borderRadius:'0 2px 2px 0'}}/>
-      {/* Indicator */}
-      <div style={{position:'absolute',left:`calc(${value}% - 4px)`,top:-3,
-        width:8,height:8,borderRadius:'50%',background:color,
-        boxShadow:`0 0 4px ${color}`,opacity:1,zIndex:1,
-        border:'1.5px solid var(--surface)'}}/>
+    <div style={{position:'relative',height:5,borderRadius:3,background:gradient,width:'100%',marginTop:6}}>
+      {/* mask right part */}
+      <div style={{position:'absolute',left:`${pct}%`,right:0,top:0,bottom:0,
+        background:'var(--surface2)',opacity:0.75,borderRadius:'0 3px 3px 0'}}/>
+      {/* dot */}
+      <div style={{position:'absolute',left:`calc(${pct}% - 5px)`,top:-3,
+        width:10,height:10,borderRadius:'50%',
+        background:color,border:'2px solid var(--surface2)',
+        boxShadow:`0 0 6px ${color}, 0 0 2px ${color}`,
+        zIndex:2}}/>
     </div>
   )
 }
 
-function FGCard({ icon, title, value, label, bar=true }) {
-  const color = getColor(value)
+function Card({ icon, title, value, label, barMax=100, isVix=false }) {
+  const color = isVix
+    ? (value==null?'var(--text3)':value<=15?'#00d4aa':value<=20?'#34d399':value<=25?'#f0b429':value<=30?'#ff6b35':'#ff2d55')
+    : getColor(value)
+  const displayLabel = label || (isVix
+    ? (value==null?null:value<=15?'Calm':value<=20?'Low Vol':value<=25?'Elevated':value<=30?'High Fear':'Extreme Fear')
+    : getLabel(value))
+
   return (
     <div style={{
-      flex:1, minWidth:0,
+      flex:'1 1 0', minWidth:0,
       background:'var(--surface2)',
-      border:'1px solid var(--border)',
+      border:`1px solid ${color}30`,
       borderRadius:10,
-      padding:'10px 14px',
-      display:'flex', flexDirection:'column', gap:6,
+      padding:'8px 10px',
+      display:'flex', flexDirection:'column', gap:0,
     }}>
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:10,color:'var(--text3)',fontWeight:600,letterSpacing:.5}}>
+      {/* Header row */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+        <span style={{fontSize:9,color:'var(--text3)',fontWeight:600,letterSpacing:.4,lineHeight:1.3}}>
           {icon} {title}
         </span>
-        {value != null &&
-          <span style={{fontSize:9,color:color,fontWeight:700,
-            background:`${color}18`,padding:'1px 6px',borderRadius:4}}>
-            {label || getLabel(value)}
+        {displayLabel &&
+          <span style={{fontSize:8,color:color,fontWeight:700,
+            background:`${color}22`,padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap',flexShrink:0}}>
+            {displayLabel}
           </span>
         }
       </div>
-      {/* Număr mare */}
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}>
+      {/* Number */}
+      <div style={{display:'flex',alignItems:'baseline',gap:4}}>
         <span style={{
-          fontFamily:'var(--mono)', fontSize:28, fontWeight:800,
+          fontFamily:'var(--mono)', fontWeight:800, lineHeight:1,
+          fontSize: 'clamp(20px, 5vw, 28px)',
           color: value != null ? color : 'var(--text3)',
-          lineHeight:1,
         }}>
-          {value ?? '—'}
+          {value != null ? (isVix ? value.toFixed(1) : value) : '—'}
         </span>
-        {value != null &&
-          <span style={{fontSize:10,color:'var(--text3)'}}>/ 100</span>
+        {!isVix && value != null &&
+          <span style={{fontSize:9,color:'var(--text3)'}}>/ 100</span>
         }
       </div>
-      {/* Bara */}
-      {bar && <FGBar value={value}/>}
-      {/* Zone hint */}
-      {value == null &&
-        <span style={{fontSize:9,color:'var(--text3)'}}>Date indisponibile</span>
-      }
-    </div>
-  )
-}
-
-function VixCard({ vix, vixLabel, vixColor }) {
-  const zones = [
-    {max:15, label:'Calm',        color:'#00d4aa'},
-    {max:20, label:'Low Vol',     color:'#34d399'},
-    {max:25, label:'Elevated',    color:'#f0b429'},
-    {max:30, label:'High Fear',   color:'#ff6b35'},
-    {max:999,label:'Extreme Fear',color:'#ff2d55'},
-  ]
-  const zone = zones.find(z => (vix??0) <= z.max) || zones[zones.length-1]
-  const color = vix != null ? zone.color : 'var(--text3)'
-  // VIX bar: 0-50 range
-  const pct = vix != null ? Math.min((vix / 50) * 100, 100) : null
-
-  return (
-    <div style={{
-      flex:1, minWidth:0,
-      background:'var(--surface2)',
-      border:'1px solid var(--border)',
-      borderRadius:10,
-      padding:'10px 14px',
-      display:'flex', flexDirection:'column', gap:6,
-    }}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:10,color:'var(--text3)',fontWeight:600,letterSpacing:.5}}>
-          📊 VIX
-        </span>
-        {vix != null &&
-          <span style={{fontSize:9,color,fontWeight:700,
-            background:`${color}18`,padding:'1px 6px',borderRadius:4}}>
-            {zone.label}
-          </span>
-        }
-      </div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}>
-        <span style={{fontFamily:'var(--mono)',fontSize:28,fontWeight:800,color,lineHeight:1}}>
-          {vix != null ? vix.toFixed(1) : '—'}
-        </span>
-      </div>
-      {/* Bara VIX — verde la stânga, roșu la dreapta */}
-      {pct != null ? (
-        <div style={{position:'relative',height:4,borderRadius:2,
-          background:'linear-gradient(to right, #00d4aa 0%, #34d399 30%, #f0b429 50%, #ff6b35 70%, #ff2d55 100%)',
-          width:'100%', opacity:0.35}}>
-          <div style={{position:'absolute',left:`${pct}%`,right:0,top:0,bottom:0,
-            background:'var(--surface)',borderRadius:'0 2px 2px 0'}}/>
-          <div style={{position:'absolute',left:`calc(${pct}% - 4px)`,top:-3,
-            width:8,height:8,borderRadius:'50%',background:color,
-            boxShadow:`0 0 4px ${color}`,opacity:1,zIndex:1,
-            border:'1.5px solid var(--surface)'}}/>
-        </div>
-      ) : (
-        <div style={{height:4,borderRadius:2,background:'var(--border)',width:'100%'}}/>
-      )}
+      {/* Bar */}
+      <FGBar value={value} maxVal={isVix ? 50 : 100}/>
     </div>
   )
 }
 
 export default function FearGreedBanner({ fearGreed, vix }) {
-  const cryptoVal = fearGreed?.crypto?.value ?? fearGreed?.value ?? null
+  const cryptoVal   = fearGreed?.crypto?.value ?? fearGreed?.value ?? null
   const cryptoLabel = fearGreed?.crypto?.label ?? fearGreed?.label ?? null
-  const stockVal  = fearGreed?.stock?.value ?? null
-  const stockLabel = fearGreed?.stock?.label ?? null
+  const stockVal    = fearGreed?.stock?.value ?? null
+  const stockLabel  = fearGreed?.stock?.label ?? null
 
   return (
-    <div style={{
-      display:'flex', gap:10,
-      marginBottom:16,
-      flexWrap:'wrap',
-    }}>
-      <FGCard
-        icon="📈" title="STOCKS F&G (CNN)"
-        value={stockVal} label={stockLabel}
-      />
-      <FGCard
-        icon="₿" title="CRYPTO F&G"
-        value={cryptoVal} label={cryptoLabel}
-      />
-      <VixCard vix={vix}/>
+    <div style={{display:'flex', gap:8, marginBottom:16, flexWrap:'nowrap'}}>
+      <Card icon="📈" title="STOCKS F&G (CNN)" value={stockVal}  label={stockLabel}/>
+      <Card icon="₿"  title="CRYPTO F&G"       value={cryptoVal} label={cryptoLabel}/>
+      <Card icon="📊" title="VIX"              value={vix}       isVix={true}/>
     </div>
   )
 }
