@@ -294,14 +294,13 @@ export default function Positions({ onEditTx }) {
             </div>
           ) : (
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <table className="data-table" style={{minWidth:680}}>
+              <table className="data-table" style={{minWidth:420}}>
                 <thead><tr>
                   <th style={STICKY_H}>Symbol</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
-                  <th>Acțiuni</th>
-                  <th style={{textAlign:'right'}}>Profit Realizat</th>
+                  <th style={{textAlign:'right'}}>Profit</th>
                   <th style={{textAlign:'right'}}>ROI</th>
-                  <th style={{textAlign:'right'}} className="hide-mobile">Ultima vânzare</th>
+                  <th style={{textAlign:'right'}} className="hide-mobile">Vânzare</th>
                 </tr></thead>
                 <tbody>
                   {filteredClosed.map((p,i) => {
@@ -325,14 +324,11 @@ export default function Positions({ onEditTx }) {
                           </div>
                           {info.cap&&<span style={{fontSize:8,padding:'1px 4px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                         </td>
-                        <td>
-                          <div className="mono" style={{fontSize:12}}>{p.totalShares?.toFixed(4)||'—'}</div>
+                        <td style={{textAlign:'right'}}>
+                          <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:12,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
                         </td>
                         <td style={{textAlign:'right'}}>
-                          <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:13,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
-                        </td>
-                        <td style={{textAlign:'right'}}>
-                          <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:13,fontWeight:700}}>{fmtPct(p.roi)}</span>
+                          <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:12,fontWeight:700}}>{fmtPct(p.roi)}</span>
                         </td>
                         <td style={{textAlign:'right'}} className="hide-mobile">
                           <span style={{fontSize:11,color:'var(--text3)'}}>{fmtDate(p.lastDate)}</span>
@@ -343,7 +339,7 @@ export default function Positions({ onEditTx }) {
                 </tbody>
                 <tfoot>
                   <tr className="total-row">
-                    <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
+                    <td colSpan={2} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
                     <td style={{textAlign:'right'}}>
                       <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
                         {fmtC(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}
@@ -374,3 +370,4 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
+
