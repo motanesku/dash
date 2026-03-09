@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
-import FearGreedGauge from '../components/FearGreedGauge.jsx'
+import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 import MarketStatus from '../components/MarketStatus.jsx'
@@ -355,6 +355,8 @@ export default function Dashboard() {
   const txs=useStore(s=>s.txs)
   const prices=useStore(s=>s.prices)
   const fearGreed=useStore(s=>s.fearGreed)
+  const marketData=useStore(s=>s.marketData)
+  const vix = marketData?.['^VIX']?.price ?? null
   const companyInfo=useStore(s=>s.companyInfo)
   const cloudLoading=useStore(s=>s.cloudLoading)
   const pricesLoading=useStore(s=>s.pricesLoading)
@@ -373,7 +375,6 @@ export default function Dashboard() {
     {id:'alloc',label:'▦ Alocare'},
     {id:'monthly',label:'📊 Lunar'},
     {id:'sectors',label:'🥧 Sectoare'},
-    {id:'fg',label:'😨 Fear & Greed'},
   ]
 
   return(
@@ -386,6 +387,7 @@ export default function Dashboard() {
 
       <MarketStatus/>
       <MarketTicker/>
+      <FearGreedBanner fearGreed={fearGreed} vix={vix}/>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20}}>
         <StatCard delay={1} label="Valoare Totală" value={fmtC(agg.totalCurValue)} sub={`${positions.length} poziții`} accent="var(--blue)"/>
@@ -411,7 +413,6 @@ export default function Dashboard() {
           {chartTab==='alloc'   && <AllocChart positions={positions}/>}
           {chartTab==='monthly' && <MonthlyChart txs={txs} prices={prices}/>}
           {chartTab==='sectors' && <SectorPieChart positions={positions} companyInfo={companyInfo}/>}
-          {chartTab==='fg'      && <FearGreedGauge fearGreed={fearGreed}/>}
         </div>
       )}
 
