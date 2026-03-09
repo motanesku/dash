@@ -120,21 +120,39 @@ function fmt(v, decimals = 2) {
   }).format(v)
 }
 
+async function fetchQuote(sym) {
+  try {
+    const r = await fetch(`${WORKER_URL}/api/prices?symbols=${encodeURIComponent(sym)}`)
+    const d = await r.json()
+    return d?.[sym] || null
+  } catch { return null }
+}
+
 function Card({ sym, label, decimals = 2, prices }) {
   const [points, setPoints] = useState([])
   const [loading, setLoading] = useState(true)
+  const [quote, setQuote] = useState(null)
   const mounted = useRef(true)
 
   useEffect(() => {
     mounted.current = true
     setLoading(true)
-    fetchHistory(sym).then(pts => {
-      if (mounted.current) { setPoints(pts); setLoading(false) }
+    setQuote(null)
+    Promise.all([
+      fetchHistory(sym),
+      fetchQuote(sym),
+    ]).then(([pts, q]) => {
+      if (mounted.current) {
+        setPoints(pts)
+        setQuote(q)
+        setLoading(false)
+      }
     })
     return () => { mounted.current = false }
   }, [sym])
 
-  const pd       = prices?.[sym]
+  // Preferă quote direct, fallback la prices din store
+  const pd       = quote || prices?.[sym]
   const price    = pd?.price
   const change   = pd?.change
   const changePct= pd?.changePct
@@ -233,3 +251,4 @@ export default function MarketCards({ prices }) {
     </div>
   )
 }
+
