@@ -70,6 +70,8 @@ export function calcPortfolio(txs, prices) {
     .filter(([, trades]) => trades.length > 0)
     .map(([key, trades]) => {
       const [broker, symbol] = key.split('::');
+      const nameTx = sorted.find(t => t.symbol === symbol && t.broker === broker);
+      const name = nameTx?.name || prices[symbol]?.name || '';
       const totalProfit = trades.reduce((s,t) => s+t.profit, 0);
       const totalCost   = trades.reduce((s,t) => s+t.buyPrice*t.shares, 0);
       const totalShares = trades.reduce((s,t) => s+t.shares, 0);
@@ -77,6 +79,7 @@ export function calcPortfolio(txs, prices) {
         symbol, broker, trades, totalProfit, totalCost, totalShares,
         roi:      totalCost > 0 ? (totalProfit/totalCost)*100 : 0,
         lastDate: trades[trades.length-1]?.sellDate,
+        name,
       };
     })
     .sort((a,b) => b.totalProfit - a.totalProfit);
