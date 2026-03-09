@@ -111,16 +111,47 @@ export async function fetchHistory(symbol, range = '3mo') {
 }
 
 export async function fetchFearGreed() {
-  if (USE_WORKER) {
-    try { return await fetchFearGreedWorker(); } catch {}
-  }
-  try {
-    const r = await fetchWithTimeout('https://api.alternative.me/fng/', 5000);
-    const j = await r.json();
-    const d = j?.data?.[0];
-    if (d) return { value: +d.value, label: d.value_classification };
-  } catch {}
-  return null;
+  // Fetch crypto from Worker (alternative.me) + CNN directly from browser in parallel
+  const [cryptoResult, cnnResult] = await Promise.allSettled([
+    (async () => {
+      if (USE_WORKER) {
+        try {
+          const r = await fetchFearGreedWorker();
+          if (r?.ok && r.crypto?.value != null) return r.crypto;
+        } catch {}
+      }
+      // Fallback: direct
+      const r = await fetchWithTimeout('https://api.alternative.me/fng/?limit=30', 5000);
+      const j = await r.json();
+      const arr = j?.data || [];
+      if (!arr.length) return null;
+      return {
+        value: +arr[0].value,
+        label: arr[0].value_classification,
+        history: arr.map(x => ({ date: new Date(+x.timestamp*1000).toISOString().split('T')[0], value: +x.value })).reverse(),
+      };
+    })(),
+    (async () => {
+      const r = await fetchWithTimeout('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', 6000);
+      const d = await r.json();
+      const fg = d?.fear_and_greed;
+      if (!fg?.score) return null;
+      const ratingMap = {'extreme_fear':'Extreme Fear','fear':'Fear','neutral':'Neutral','greed':'Greed','extreme_greed':'Extreme Greed'};
+      return {
+        value: Math.round(fg.score),
+        label: ratingMap[fg.rating] || fg.rating || '',
+        prev_close: fg.previous_close ? Math.round(fg.previous_close) : null,
+        prev_week:  fg.previous_1_week ? Math.round(fg.previous_1_week) : null,
+        prev_month: fg.previous_1_month ? Math.round(fg.previous_1_month) : null,
+        prev_year:  fg.previous_1_year ? Math.round(fg.previous_1_year) : null,
+      };
+    })(),
+  ]);
+
+  const crypto = cryptoResult.status === 'fulfilled' ? cryptoResult.value : null;
+  const stock  = cnnResult.status === 'fulfilled' ? cnnResult.value : null;
+  if (!crypto && !stock) return null;
+  return { crypto, stock };
 }
 
 // Symbols shown as market cards (VIX excluded - shown in status bar instead)
@@ -142,15 +173,43 @@ export const ALL_MARKET_SYMBOLS = [
 ];
 
 // ── Company Info (sector, cap, domain) ─────────────────────
+// Fetch direct din browser (Yahoo blochează din Cloudflare Workers)
+function capFromMarketCap(mktCap) {
+  if (!mktCap) return '';
+  if (mktCap > 200e9) return 'Mega Cap';
+  if (mktCap > 10e9)  return 'Large Cap';
+  if (mktCap > 2e9)   return 'Mid Cap';
+  if (mktCap > 300e6) return 'Small Cap';
+  return 'Micro Cap';
+}
+
 export async function fetchCompanyInfo(symbols) {
   if (!symbols.length) return {};
+  const info = {};
+
+  // Yahoo v7/finance/quote — funcționează din browser, nu din Workers
   try {
-    const { WORKER_URL, USE_WORKER } = await import('../config.js');
-    if (!USE_WORKER) return {};
-    const url = `${WORKER_URL}/api/info?symbols=${encodeURIComponent(symbols.join(','))}`;
+    const symsStr = symbols.map(s => encodeURIComponent(s)).join(',');
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symsStr}&fields=shortName,longName,sector,industry,marketCap,quoteType`;
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
     const j = await r.json();
-    if (j.ok) return j.info;
+    const results = j?.quoteResponse?.result || [];
+    results.forEach(q => {
+      if (!q.symbol) return;
+      info[q.symbol] = {
+        sector:   q.sector   || '',
+        industry: q.industry || '',
+        domain:   q.industry || q.sector || '',
+        cap:      capFromMarketCap(q.marketCap),
+        name:     q.shortName || q.longName || '',
+      };
+    });
   } catch {}
-  return {};
+
+  // Fill missing
+  symbols.forEach(sym => {
+    if (!info[sym]) info[sym] = { sector: '', industry: '', domain: '', cap: '', name: '' };
+  });
+
+  return info;
 }
