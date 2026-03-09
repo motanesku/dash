@@ -156,14 +156,34 @@ export async function fetchFearGreed() {
 
 // Symbols shown as market cards (VIX excluded - shown in status bar instead)
 export const MARKET_SYMBOLS = [
-  { sym: '^GSPC', label: 'S&P 500' },
-  { sym: '^DJI', label: 'Dow Jones' },
-  { sym: '^IXIC', label: 'Nasdaq' },
-  { sym: 'GC=F', label: 'Gold' },
-  { sym: 'CL=F', label: 'Oil' },
-  { sym: 'BTC-USD', label: 'Bitcoin' },
+  // Overview
+  { sym: '^GSPC',    label: 'S&P 500'     },
+  { sym: '^IXIC',    label: 'Nasdaq'      },
+  { sym: '^DJI',     label: 'Dow 30'      },
+  { sym: 'DX-Y.NYB', label: 'USD Index'   },
+  // Stocks top7
+  { sym: 'AAPL',  label: 'Apple'      },
+  { sym: 'NVDA',  label: 'NVIDIA'     },
+  { sym: 'MSFT',  label: 'Microsoft'  },
+  { sym: 'AMZN',  label: 'Amazon'     },
+  { sym: 'GOOGL', label: 'Alphabet'   },
+  { sym: 'META',  label: 'Meta'       },
+  { sym: 'TSLA',  label: 'Tesla'      },
+  // Futures
+  { sym: 'GC=F', label: 'Gold'        },
+  { sym: 'SI=F', label: 'Silver'      },
+  { sym: 'CL=F', label: 'Crude Oil'   },
+  { sym: 'NG=F', label: 'Natural Gas' },
+  { sym: 'HG=F', label: 'Copper'      },
+  { sym: 'PL=F', label: 'Platinum'    },
+  // Crypto
+  { sym: 'BTC-USD', label: 'Bitcoin'  },
+  { sym: 'ETH-USD', label: 'Ethereum' },
+  // Forex
+  { sym: 'EURUSD=X', label: 'EUR/USD' },
+  { sym: 'USDJPY=X', label: 'USD/JPY' },
   { sym: 'EURRON=X', label: 'EUR/RON' },
-  { sym: 'RON=X', label: 'USD/RON' },
+  { sym: 'RON=X',    label: 'USD/RON' },
 ];
 
 // All symbols to fetch (includes VIX for status bar)
