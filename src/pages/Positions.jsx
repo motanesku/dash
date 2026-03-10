@@ -50,12 +50,7 @@ export default function Positions({ onEditTx }) {
   const companyInfo       = useStore(s => s.companyInfo)
   const fetchCompanyInfo  = useStore(s => s.fetchCompanyInfo)
 
-  // Auto-fetch company info for all symbols not yet cached
-  useEffect(() => {
-    const allSyms = [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol || t.sym).filter(Boolean))]
-    const missing = allSyms.filter(s => !companyInfo[s]?.sector)
-    if (missing.length) fetchCompanyInfo(missing)
-  }, [txs.length])
+  // Date introduse manual prin CompanyEditModal — nu mai facem auto-fetch Yahoo (blocat CORS)
 
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
@@ -294,7 +289,7 @@ export default function Positions({ onEditTx }) {
             </div>
           ) : (
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <table className="data-table" style={{minWidth:420}}>
+              <table className="data-table" style={{minWidth:580}}>
                 <thead><tr>
                   <th style={STICKY_H}>Symbol</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
@@ -307,22 +302,22 @@ export default function Positions({ onEditTx }) {
                     const info = companyInfo[p.symbol] || {}
                     return (
                       <tr key={i}>
-                        <td style={{...STICKY, borderRight:'1px solid var(--border)', width:90, minWidth:90, maxWidth:90}}>
-                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:12,color:'var(--text)',cursor:isAdmin?'pointer':'default',display:'inline-flex',alignItems:'center',gap:4}}
+                        <td style={{...STICKY, borderRight:'1px solid var(--border)', minWidth:110, maxWidth:140}}>
+                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',cursor:isAdmin?'pointer':'default',display:'inline-flex',alignItems:'center',gap:4}}
                             onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
                             {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>}
                           </div>
-                          <div style={{fontSize:9,color:'var(--text3)',marginTop:2,lineHeight:1.3,wordBreak:'break-word',whiteSpace:'normal'}}>{p.name||''}</div>
+                          <div style={{fontSize:10,color:'var(--text3)',marginTop:2,lineHeight:1.3,whiteSpace:'normal'}}>{p.name||''}</div>
                           <div style={{display:'flex',gap:3,marginTop:3,flexWrap:'wrap'}}>
                             <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{p.broker}</span>
                           </div>
                         </td>
-                        <td style={{borderRight:'1px solid var(--border2)', width:80, minWidth:80, maxWidth:80}}>
-                          <div style={{display:'flex',gap:3,flexWrap:'wrap',alignItems:'flex-start'}}>
-                            {info.sector&&<span style={{fontSize:9,color:'var(--blue)',fontWeight:500,wordBreak:'break-word'}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
-                            {info.industry&&<span style={{fontSize:9,color:'var(--text3)',wordBreak:'break-word'}}>· {info.industry}</span>}
+                        <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
+                          <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                            {info.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
+                            {info.industry&&<span style={{fontSize:10,color:'var(--text3)'}}>· {info.industry}</span>}
                           </div>
-                          {info.cap&&<span style={{fontSize:8,padding:'1px 4px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
+                          {info.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                         </td>
                         <td style={{textAlign:'right'}}>
                           <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:12,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
@@ -370,4 +365,3 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
-
