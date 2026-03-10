@@ -16,7 +16,15 @@ function writeCache(key, val) {
 
 // Load cached prices immediately on startup
 const cachedPrices = readCache(PRICES_CACHE_KEY) || {};
-const cachedMarket = readCache(MARKET_CACHE_KEY) || {};
+const cachedMarket = (() => {
+  const m = readCache(MARKET_CACHE_KEY) || {};
+  // Dacă VIX lipsește sau e 0 în cache, bust cache-ul market
+  if (!m['^VIX']?.price) {
+    try { localStorage.removeItem(MARKET_CACHE_KEY); } catch {}
+    return {};
+  }
+  return m;
+})();
 const cachedFG = readCache(FEARGREED_CACHE_KEY);
 
 const useStore = create((set, get) => ({
