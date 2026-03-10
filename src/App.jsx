@@ -14,7 +14,7 @@ import ImportModal from './components/ImportModal.jsx'
 import AlertsPanel from './components/AlertsPanel.jsx'
 
 export default function App() {
-  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, loadFoxData, loadCompanyInfo, fetchCompanyInfo, txs, prices, checkAlerts, pricesUpdated, theme } = useStore()
+  const { tab, loadTxs, fetchAllPrices, loadClub: loadClubData, loadFoxData, loadCompanyInfo, fetchCompanyInfo, txs, prices, checkAlerts, pricesUpdated, theme, loadAlerts } = useStore()
   const [showPin, setShowPin] = useState(false)
   const [showAddTx, setShowAddTx] = useState(false)
   const [editTx, setEditTx] = useState(null)
@@ -31,6 +31,7 @@ export default function App() {
     loadClubData()
     loadFoxData()
     loadCompanyInfo()
+    loadAlerts()
   }, [])
 
   useEffect(() => {
