@@ -176,36 +176,6 @@ function MobileClosedCard({ p, companyInfo, isAdmin, onEditInfo }) {
   )
 }
 
-// ── Aggregate positions with same symbol across brokers ───────
-function aggregateBySymbol(positions) {
-  const map = {}
-  positions.forEach(p => {
-    if (!map[p.symbol]) {
-      map[p.symbol] = { ...p, brokers: [p.broker] }
-    } else {
-      const e = map[p.symbol]
-      const newShares   = e.shares + p.shares
-      const newCost     = e.costBasis + p.costBasis
-      const newCurValue = (e.curValue||0) + (p.curValue||0)
-      const newUnr      = (e.unrealizedPnl||0) + (p.unrealizedPnl||0)
-      const newReal     = e.realizedPnl + p.realizedPnl
-      map[p.symbol] = {
-        ...e,
-        shares:        newShares,
-        costBasis:     newCost,
-        curValue:      newCurValue,
-        unrealizedPnl: newUnr,
-        unrealizedPct: newCost > 0 ? (newUnr / newCost) * 100 : null,
-        realizedPnl:   newReal,
-        avgPrice:      newShares > 0 ? newCost / newShares : 0,
-        dayChange:     p.dayChange, // use latest
-        brokers:       [...e.brokers, p.broker],
-      }
-    }
-  })
-  return Object.values(map).sort((a,b) => (b.curValue||0) - (a.curValue||0))
-}
-
 export default function Positions({ onEditTx }) {
   const txs          = useStore(s => s.txs)
   const prices       = useStore(s => s.prices)
