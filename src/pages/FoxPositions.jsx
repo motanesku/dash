@@ -204,11 +204,7 @@ export default function FoxPositions() {
   const [editItem,      setEditItem]      = useState(null)
   const [view,          setView]          = useState('open')
 
-  // Fetch company info for symbols not yet cached
-  useEffect(() => {
-    const syms = [...new Set(foxData.map(f=>f.symbol))].filter(s=>s&&!companyInfo[s]?.sector)
-    if (syms.length) fetchCompanyInfo(syms)
-  }, [foxData.length])
+  // Company info introdusă manual — nu mai facem auto-fetch Yahoo
 
   // Separate open vs closed
   const openFox   = useMemo(() => foxData.filter(f => f.status!=='closed'), [foxData])
