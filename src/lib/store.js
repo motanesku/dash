@@ -130,9 +130,15 @@ const useStore = create((set, get) => ({
         fetchPrices(allSyms),
         fetchFearGreed().then(fg => {
           if (fg) {
-            // support both old format (value) and new format (crypto + stock)
             set({ fearGreed: fg });
             writeCache(FEARGREED_CACHE_KEY, fg);
+            // VIX vine din feargreed (mai sigur decât /api/prices pentru ^VIX)
+            if (fg.vix?.price != null) {
+              const cur = get().marketData;
+              const updated = { ...cur, '^VIX': { ...fg.vix, name: 'VIX', currency: 'USD', marketState: 'REGULAR' } };
+              set({ marketData: updated });
+              writeCache(MARKET_CACHE_KEY, updated);
+            }
           }
         }),
       ]);
@@ -367,4 +373,3 @@ const useStore = create((set, get) => ({
 }));
 
 export default useStore;
-
