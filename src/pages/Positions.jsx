@@ -51,99 +51,110 @@ function aggregateBySymbol(positions) {
 }
 
 // ── Mobile Position Card ─────────────────────────────────────
-function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected }) {
+function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children }) {
   const info = companyInfo[p.symbol] || {}
   const brokerList = p.brokers || [p.broker]
   const unrColor = (p.unrealizedPnl||0) >= 0 ? 'var(--green)' : 'var(--red)'
   const dayColor = (p.dayChange||0) >= 0 ? 'var(--green)' : 'var(--red)'
 
   return (
-    <div style={{
-      background:'var(--surface)',border:`1px solid ${selected?'var(--blue)':'var(--border)'}`,
-      borderRadius:12,padding:'14px 16px',marginBottom:10,
-      borderLeft:`3px solid ${unrColor}`,transition:'all .15s',
-    }}>
-      {/* Header */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
-        <div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>{p.symbol}</span>
-            {p.dayChange!=null && (
-              <span style={{fontSize:11,fontWeight:600,color:dayColor,fontFamily:'var(--mono)'}}>
-                {p.dayChange>=0?'+':''}{p.dayChange.toFixed(2)}% azi
-              </span>
-            )}
+    <div style={{marginBottom:10}}>
+      <div style={{
+        background:'var(--surface)',border:`1px solid ${selected?'var(--blue)':'var(--border)'}`,
+        borderRadius:selected?'12px 12px 0 0':12,padding:'14px 16px',
+        borderLeft:`3px solid ${unrColor}`,transition:'all .15s',
+      }}>
+        {/* Rând 1 — Header */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>{p.symbol}</span>
+              {p.dayChange!=null && (
+                <span style={{fontSize:11,fontWeight:600,color:dayColor,fontFamily:'var(--mono)'}}>
+                  {p.dayChange>=0?'+':''}{p.dayChange.toFixed(2)}% azi
+                </span>
+              )}
+            </div>
+            <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{p.name}</div>
+            <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+              {brokerList.map(b => (
+                <span key={b} style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',
+                  color:BROKER_COLORS[brokers.indexOf(b)%BROKER_COLORS.length],border:'1px solid var(--border)',fontWeight:600}}>
+                  {b}
+                </span>
+              ))}
+            </div>
           </div>
-          <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{p.name}</div>
-          <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
-            {brokerList.map(b => (
-              <span key={b} style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',
-                color:BROKER_COLORS[brokers.indexOf(b)%BROKER_COLORS.length],border:'1px solid var(--border)',fontWeight:600}}>
-                {b}
-              </span>
-            ))}
-            {info.sector && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',color:'var(--blue)',border:'1px solid var(--border)'}}>
-              {SECTOR_ICONS[info.sector]||''} {info.sector}
-            </span>}
+          {/* Valoare + unrealized */}
+          <div style={{textAlign:'right'}}>
+            <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
+              {p.curValue ? fmtC(p.curValue, p.currency) : '—'}
+            </div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:unrColor}}>
+              {p.unrealizedPnl!=null ? fmtC(p.unrealizedPnl,p.currency) : '—'}
+            </div>
+            <div style={{fontFamily:'var(--mono)',fontSize:11,color:unrColor}}>
+              {p.unrealizedPct!=null ? fmtPct(p.unrealizedPct) : ''}
+            </div>
           </div>
         </div>
-        {/* Valoare + unrealized */}
-        <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
-            {p.curValue ? fmtC(p.curValue, p.currency) : '—'}
+
+        {/* Rând 2 — CAP | — | Current Price */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)',marginBottom:6}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CAP</div>
+            <div style={{fontSize:11,color:CAP_COLORS_NEW[info.cap]||'var(--text3)',fontWeight:600}}>{info.cap||'—'}</div>
           </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:unrColor}}>
-            {p.unrealizedPnl!=null ? fmtC(p.unrealizedPnl,p.currency) : '—'}
+          <div/>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CUR PRICE</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:'var(--text)'}}>{p.curPrice ? fmtC(p.curPrice,p.currency) : '—'}</div>
           </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:11,color:unrColor}}>
-            {p.unrealizedPct!=null ? fmtPct(p.unrealizedPct) : ''}
+        </div>
+
+        {/* Rând 3 — Shares | Avg Price | Cost */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)',marginBottom:10}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SHARES</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{p.shares.toFixed(4)}</div>
           </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>AVG PRICE</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.avgPrice,p.currency)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>COST</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.costBasis,p.currency)}</div>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{display:'flex',gap:8}}>
+          <button onClick={()=>onSelect(p)} style={{
+            flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
+            background:selected?'var(--blue-bg)':'var(--surface2)',
+            color:selected?'var(--blue)':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
+          }}>
+            {selected ? '▲ Ascunde chart' : '📈 Chart'}
+          </button>
+          {isAdmin && (
+            <button onClick={()=>onEditInfo(p.symbol)} style={{
+              padding:'6px 10px',borderRadius:6,border:'1px solid var(--border)',
+              background:'var(--surface2)',color:'var(--text3)',cursor:'pointer',fontSize:11,
+            }}>✏</button>
+          )}
         </div>
       </div>
 
-      {/* Detalii */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'10px 0',borderTop:'1px solid var(--border)',borderBottom:'1px solid var(--border)',marginBottom:10}}>
-        <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SHARES</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{p.shares.toFixed(4)}</div>
-        </div>
-        <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>AVG PRICE</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.avgPrice,p.currency)}</div>
-        </div>
-        <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CUR PRICE</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12}}>{p.curPrice ? fmtC(p.curPrice,p.currency) : '—'}</div>
-        </div>
-        <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>COST</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.costBasis,p.currency)}</div>
-        </div>
-        <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>REALIZAT</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12,color:p.realizedPnl>=0?'var(--green)':'var(--red)',fontWeight:600}}>{fmtC(p.realizedPnl)}</div>
-        </div>
-        {info.cap && <div>
-          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CAP</div>
-          <div style={{fontSize:11,color:CAP_COLORS_NEW[info.cap]||'var(--text3)',fontWeight:600}}>{info.cap}</div>
-        </div>}
-      </div>
-
-      {/* Actions */}
-      <div style={{display:'flex',gap:8}}>
-        <button onClick={()=>onSelect(p)} style={{
-          flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
-          background:'var(--surface2)',color:'var(--text3)',cursor:'pointer',fontSize:11,
+      {/* Chart apare direct sub card, nu la finalul paginii */}
+      {selected && (
+        <div style={{
+          background:'var(--surface)',border:'1px solid var(--blue)',borderTop:'none',
+          borderRadius:'0 0 12px 12px',padding:'14px 16px',
         }}>
-          {selected ? '▲ Ascunde chart' : '📈 Chart'}
-        </button>
-        {isAdmin && (
-          <button onClick={()=>onEditInfo(p.symbol)} style={{
-            padding:'6px 10px',borderRadius:6,border:'1px solid var(--border)',
-            background:'var(--surface2)',color:'var(--text3)',cursor:'pointer',fontSize:11,
-          }}>✏ Info</button>
-        )}
-      </div>
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -151,24 +162,71 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
 // ── Mobile Closed Position Card ───────────────────────────────
 function MobileClosedCard({ p, companyInfo, isAdmin, onEditInfo }) {
   const info = companyInfo[p.symbol] || {}
+  const profitColor = p.totalProfit >= 0 ? 'var(--green)' : 'var(--red)'
+
   return (
     <div style={{
       background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,
-      padding:'12px 14px',marginBottom:8,
-      borderLeft:`3px solid ${p.totalProfit>=0?'var(--green)':'var(--red)'}`,
+      padding:'14px 16px',marginBottom:10,
+      borderLeft:`3px solid ${profitColor}`,
     }}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+      {/* Rând 1 — Header: Symbol + Profit + ROI */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
         <div>
-          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:14}}>{p.symbol}</div>
-          <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{p.broker} · {info.sector||''}</div>
-          {p.lastDate && <div style={{fontSize:10,color:'var(--text3)'}}>{fmtDate(p.lastDate)}</div>}
+          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>{p.symbol}</div>
+          <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{p.name}</div>
+          <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+            <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)',fontWeight:600}}>{p.broker}</span>
+            {info.sector && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',color:'var(--blue)',border:'1px solid var(--border)'}}>
+              {SECTOR_ICONS[info.sector]||''} {info.sector}
+            </span>}
+          </div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:15,color:p.totalProfit>=0?'var(--green)':'var(--red)'}}>
+          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:profitColor}}>
             {fmtC(p.totalProfit)}
           </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:12,color:p.roi>=0?'var(--green)':'var(--red)',fontWeight:600}}>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:profitColor}}>
             {fmtPct(p.roi)}
+          </div>
+          <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{p.lastDate ? `închis ${p.lastDate}` : ''}</div>
+        </div>
+      </div>
+
+      {/* Rând BUY */}
+      <div style={{padding:'8px 10px',borderRadius:6,background:'rgba(88,166,255,0.06)',border:'1px solid rgba(88,166,255,0.15)',marginBottom:6}}>
+        <div style={{fontSize:9,color:'var(--blue)',fontWeight:700,marginBottom:6,letterSpacing:.5}}>BUY</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SHARES</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{p.totalShares.toFixed(4)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>AVG BUY</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.avgBuyPrice)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>COST</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(p.totalCost)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Rând SELL */}
+      <div style={{padding:'8px 10px',borderRadius:6,background:p.totalProfit>=0?'rgba(0,212,170,0.06)':'rgba(255,85,114,0.06)',border:`1px solid ${p.totalProfit>=0?'rgba(0,212,170,0.15)':'rgba(255,85,114,0.15)'}`}}>
+        <div style={{fontSize:9,color:profitColor,fontWeight:700,marginBottom:6,letterSpacing:.5}}>SELL</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SHARES</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{p.totalShares.toFixed(4)}</div>
+          </div>
+          <div>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>AVG SELL</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,color:profitColor,fontWeight:600}}>{fmtC(p.avgSellPrice)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ÎNCASAT</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,color:profitColor,fontWeight:600}}>{fmtC(p.totalRevenue)}</div>
           </div>
         </div>
       </div>
@@ -374,7 +432,9 @@ export default function Positions({ onEditTx }) {
                 onEditInfo={sym=>setEditInfoSym(sym)}
                 onSelect={pos=>setSelectedPos(selectedPos?.symbol===pos.symbol?null:pos)}
                 selected={selectedPos?.symbol===p.symbol}
-              />
+              >
+                <PriceChart symbol={p.symbol} height={200}/>
+              </MobilePositionCard>
             ))}
           </div>
         ) : (
@@ -439,7 +499,9 @@ export default function Positions({ onEditTx }) {
               </tbody>
               <tfoot>
                 <tr className="total-row">
-                  <td colSpan={3} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL {brokerTab||'PORTOFOLIU'}</td>
+                  <td colSpan={2} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL {brokerTab||'PORTOFOLIU'}</td>
+                  <td/>
+                  <td/>
                   <td style={{textAlign:'right'}}>
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontWeight:700}}>{fmtC(totalUnrealized)}</div>
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontSize:10}}>{totalCost>0?fmtPct(totalUnrealized/totalCost*100):''}</div>
@@ -481,13 +543,26 @@ export default function Positions({ onEditTx }) {
         ) : (
         <div className="card" style={{overflow:'hidden',marginBottom:16}}>
             <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-              <table className="data-table" style={{minWidth:580}}>
+              <table className="data-table" style={{minWidth:720}}>
                 <thead><tr>
                   <th style={STICKY_H}>Symbol</th>
                   <th style={{borderRight:'1px solid var(--border2)'}}>Sector · Cap</th>
-                  <th style={{textAlign:'right'}}>Profit</th>
+                  <th>
+                    <span style={{fontSize:9,color:'var(--blue)',fontWeight:700,letterSpacing:.5}}>BUY</span>
+                    <div style={{display:'flex',gap:16,marginTop:2}}>
+                      <span>Shares</span>
+                      <span>Avg Buy</span>
+                      <span>Cost</span>
+                    </div>
+                  </th>
+                  <th>
+                    <span style={{fontSize:9,color:'var(--green)',fontWeight:700,letterSpacing:.5}}>SELL</span>
+                    <div style={{display:'flex',gap:16,marginTop:2}}>
+                      <span>Avg Sell</span>
+                      <span>Încasat</span>
+                    </div>
+                  </th>
                   <th style={{textAlign:'right'}}>ROI</th>
-                  <th style={{textAlign:'right'}} className="hide-mobile">Vânzare</th>
                 </tr></thead>
                 <tbody>
                   {filteredClosed.map((p,i) => {
@@ -500,25 +575,47 @@ export default function Positions({ onEditTx }) {
                             {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5}}>✏</span>}
                           </div>
                           <div style={{fontSize:10,color:'var(--text3)',marginTop:2,lineHeight:1.3,whiteSpace:'normal'}}>{p.name||''}</div>
-                          <div style={{display:'flex',gap:3,marginTop:3,flexWrap:'wrap'}}>
-                            <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{p.broker}</span>
-                          </div>
+                          <span style={{fontSize:9,padding:'1px 4px',borderRadius:3,background:'var(--surface2)',color:'var(--text3)',border:'1px solid var(--border)'}}>{p.broker}</span>
                         </td>
                         <td style={{borderRight:'1px solid var(--border2)', minWidth:120}}>
                           <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
                             {info.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{SECTOR_ICONS[info.sector]||''} {info.sector}</span>}
-                            {info.industry&&<span style={{fontSize:10,color:'var(--text3)'}}>· {info.industry}</span>}
                           </div>
                           {info.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,marginTop:4,display:'inline-block',background:'var(--surface2)',color:(CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--text3)'),border:`1px solid ${CAP_COLORS_NEW[info.cap]||CAP_COLORS[info.cap]||'var(--border)'}40`,fontWeight:600}}>{info.cap}</span>}
                         </td>
-                        <td style={{textAlign:'right'}}>
-                          <span className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:12,fontWeight:700}}>{fmtC(p.totalProfit)}</span>
+                        <td style={{minWidth:200}}>
+                          <div style={{display:'flex',gap:16,alignItems:'baseline'}}>
+                            <div>
+                              <div className="label" style={{fontSize:9}}>Shares</div>
+                              <div className="mono" style={{fontSize:12,fontWeight:600}}>{p.totalShares.toFixed(4)}</div>
+                            </div>
+                            <div>
+                              <div className="label" style={{fontSize:9}}>Avg Buy</div>
+                              <div className="mono" style={{fontSize:12}}>{fmtC(p.avgBuyPrice)}</div>
+                            </div>
+                            <div>
+                              <div className="label" style={{fontSize:9}}>Cost</div>
+                              <div className="mono" style={{fontSize:12}}>{fmtC(p.totalCost)}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{minWidth:180}}>
+                          <div style={{display:'flex',gap:16,alignItems:'baseline'}}>
+                            <div>
+                              <div className="label" style={{fontSize:9}}>Avg Sell</div>
+                              <div className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:12,fontWeight:600}}>{fmtC(p.avgSellPrice)}</div>
+                            </div>
+                            <div>
+                              <div className="label" style={{fontSize:9}}>Încasat</div>
+                              <div className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:12,fontWeight:600}}>{fmtC(p.totalRevenue)}</div>
+                            </div>
+                          </div>
+                          <div className={`mono ${pnlClass(p.totalProfit)}`} style={{fontSize:11,marginTop:3}}>
+                            profit: {fmtC(p.totalProfit)}
+                          </div>
                         </td>
                         <td style={{textAlign:'right'}}>
-                          <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:12,fontWeight:700}}>{fmtPct(p.roi)}</span>
-                        </td>
-                        <td style={{textAlign:'right'}} className="hide-mobile">
-                          <span style={{fontSize:11,color:'var(--text3)'}}>{fmtDate(p.lastDate)}</span>
+                          <span className={`mono ${pnlClass(p.roi)}`} style={{fontSize:14,fontWeight:700}}>{fmtPct(p.roi)}</span>
                         </td>
                       </tr>
                     )
@@ -526,13 +623,25 @@ export default function Positions({ onEditTx }) {
                 </tbody>
                 <tfoot>
                   <tr className="total-row">
-                    <td colSpan={2} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
-                    <td style={{textAlign:'right'}}>
-                      <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
+                    <td colSpan={2} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE ({filteredClosed.length})</td>
+                    <td>
+                      <div className="mono" style={{fontSize:11,color:'var(--text3)'}}>{fmtC(filteredClosed.reduce((s,p)=>s+p.totalCost,0))}</div>
+                    </td>
+                    <td>
+                      <div className="mono" style={{fontSize:11,color:'var(--text3)'}}>{fmtC(filteredClosed.reduce((s,p)=>s+p.totalRevenue,0))}</div>
+                      <div className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700}}>
                         {fmtC(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}
+                      </div>
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <span className={`mono ${pnlClass(filteredClosed.reduce((s,p)=>s+p.totalProfit,0))}`} style={{fontWeight:700,fontSize:13}}>
+                        {(()=>{
+                          const cost=filteredClosed.reduce((s,p)=>s+p.totalCost,0)
+                          const profit=filteredClosed.reduce((s,p)=>s+p.totalProfit,0)
+                          return cost>0?fmtPct(profit/cost*100):'—'
+                        })()}
                       </span>
                     </td>
-                    <td colSpan={2}/>
                   </tr>
                 </tfoot>
               </table>
@@ -541,7 +650,7 @@ export default function Positions({ onEditTx }) {
         )
       )}
 
-      {selectedPos && view==='open' && (
+      {selectedPos && view==='open' && !isMobile && (
         <div className="card fade-up" style={{padding:'16px 18px',marginBottom:16}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
             <div>
