@@ -3,7 +3,7 @@ import useStore from '../lib/store.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
-import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
+import { MARKET_SYMBOLS, fetchHistory, fetchHistoryMulti } from '../lib/prices.js'
 import MarketStatus from '../components/MarketStatus.jsx'
 
 const COLORS = ['#58a6ff','#00d4aa','#a78bfa','#f0b429','#ff5572','#34d399','#fb923c','#60a5fa']
@@ -280,15 +280,29 @@ function MonthlyChart({txs,prices}) {
   )
 }
 
-// ── Performance Chart ─────────────────────────────────────────
+// ── Performance Chart — date istorice REALE ───────────────────
 function PerformanceChart({txs,prices}) {
   const [spPoints,setSpPoints]=useState([])
+  const [symHistories,setSymHistories]=useState({})
   const [loading,setLoading]=useState(false)
+  const [range,setRange]=useState('6mo')
+
+  const pfSymbols=useMemo(()=>[...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol).filter(Boolean))],[txs])
+
   useEffect(()=>{
     if(!txs.length) return
     setLoading(true)
-    fetchHistory('^GSPC','6mo').then(pts=>{setSpPoints(pts||[]);setLoading(false)}).catch(()=>setLoading(false))
-  },[])
+    setSpPoints([])
+    setSymHistories({})
+    Promise.all([
+      fetchHistory('^GSPC',range),
+      fetchHistoryMulti(pfSymbols,range),
+    ]).then(([sp,histories])=>{
+      setSpPoints(sp||[])
+      setSymHistories(histories||{})
+      setLoading(false)
+    }).catch(()=>setLoading(false))
+  },[pfSymbols.join(','),range])
 
   const pfPoints=useMemo(()=>{
     if(!txs.length||!spPoints.length) return []
@@ -299,19 +313,34 @@ function PerformanceChart({txs,prices}) {
       snap.forEach(t=>{
         if(!pos[t.symbol])pos[t.symbol]={shares:0,cost:0}
         if(t.type==='BUY'){pos[t.symbol].shares+=t.shares;pos[t.symbol].cost+=t.shares*t.price}
-        else if(t.type==='SELL'){const a=pos[t.symbol].shares>0?pos[t.symbol].cost/pos[t.symbol].shares:t.price;pos[t.symbol].shares-=t.shares;pos[t.symbol].cost-=a*t.shares}
+        else if(t.type==='SELL'){
+          const avg=pos[t.symbol].shares>0?pos[t.symbol].cost/pos[t.symbol].shares:t.price
+          pos[t.symbol].shares=Math.max(0,pos[t.symbol].shares-t.shares)
+          pos[t.symbol].cost=pos[t.symbol].shares*avg
+        }
       })
-      const val=Object.entries(pos).reduce((s,[sym,p])=>s+p.shares*(prices[sym]?.price||p.cost/Math.max(p.shares,.0001)),0)
+      // Preț ISTORIC al zilei respective per simbol
+      const val=Object.entries(pos).reduce((s,[sym,p])=>{
+        if(p.shares<=0) return s
+        const hist=symHistories[sym]||[]
+        const pt=hist.find(h=>h.date===sp.date)||hist.filter(h=>h.date<=sp.date).slice(-1)[0]
+        const px=pt?.close??prices[sym]?.price??0
+        return s+p.shares*px
+      },0)
       const cost=Object.values(pos).reduce((s,p)=>s+p.cost,0)
-      return{date:sp.date,pct:cost>0?((val-cost)/cost)*100:0}
+      return{date:sp.date,val,cost,pct:cost>0?((val-cost)/cost)*100:0}
     })
-  },[txs,spPoints,prices])
+  },[txs,spPoints,symHistories,prices])
 
-  if(loading) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40,fontFamily:'var(--mono)'}}>se încarcă...</div>
+  const RANGES=[{id:'1mo',label:'1L'},{id:'3mo',label:'3L'},{id:'6mo',label:'6L'},{id:'1y',label:'1A'},{id:'2y',label:'2A'}]
+
+  if(loading) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40,fontFamily:'var(--mono)'}}>⟳ se încarcă date istorice...</div>
   if(!spPoints.length) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40}}>Date indisponibile</div>
+
   const spFirst=spPoints[0]?.close||1
-  const spNorm=spPoints.map((p)=>({y:(p.close-spFirst)/spFirst*100}))
-  const pfNorm=pfPoints.map(p=>({y:p.pct}))
+  const pfFirst=pfPoints[0]?.pct??0
+  const spNorm=spPoints.map(p=>({y:(p.close-spFirst)/spFirst*100}))
+  const pfNorm=pfPoints.map(p=>({y:p.pct-pfFirst}))
   const allY=[...spNorm.map(p=>p.y),...pfNorm.map(p=>p.y)]
   const minY=Math.min(...allY,-2),maxY=Math.max(...allY,2),rangeY=maxY-minY||1
   const n=spNorm.length
@@ -322,19 +351,32 @@ function PerformanceChart({txs,prices}) {
   const fmtD=d=>new Date(d).toLocaleDateString('ro-RO',{day:'numeric',month:'short'})
   const spLast=spNorm[spNorm.length-1]?.y||0
   const pfLast=pfNorm[pfNorm.length-1]?.y||0
+
   return(
     <div>
-      <div style={{display:'flex',gap:16,marginBottom:10,flexWrap:'wrap'}}>
-        <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
-          <span style={{width:18,height:2,background:'#00d4aa',display:'inline-block',borderRadius:1}}/>
-          <span style={{color:'var(--text3)'}}>S&P 500</span>
-          <span className="mono" style={{fontWeight:700,color:spLast>=0?'var(--green)':'var(--red)'}}>{spLast>=0?'+':''}{spLast.toFixed(2)}%</span>
-        </span>
-        <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
-          <span style={{width:18,height:0,borderTop:'2px dashed #58a6ff',display:'inline-block'}}/>
-          <span style={{color:'var(--text3)'}}>Portofoliu</span>
-          <span className="mono" style={{fontWeight:700,color:pfLast>=0?'var(--green)':'var(--red)'}}>{pfLast>=0?'+':''}{pfLast.toFixed(2)}%</span>
-        </span>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+        <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+          <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+            <span style={{width:18,height:2,background:'#00d4aa',display:'inline-block',borderRadius:1}}/>
+            <span style={{color:'var(--text3)'}}>S&P 500</span>
+            <span className="mono" style={{fontWeight:700,color:spLast>=0?'var(--green)':'var(--red)'}}>{spLast>=0?'+':''}{spLast.toFixed(2)}%</span>
+          </span>
+          <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
+            <span style={{width:18,height:0,borderTop:'2px dashed #58a6ff',display:'inline-block'}}/>
+            <span style={{color:'var(--text3)'}}>Portofoliu</span>
+            <span className="mono" style={{fontWeight:700,color:pfLast>=0?'var(--green)':'var(--red)'}}>{pfLast>=0?'+':''}{pfLast.toFixed(2)}%</span>
+          </span>
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          {RANGES.map(r=>(
+            <button key={r.id} onClick={()=>setRange(r.id)} style={{
+              padding:'2px 8px',borderRadius:4,border:'1px solid var(--border)',cursor:'pointer',
+              fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
+              background:range===r.id?'var(--blue)':'transparent',
+              color:range===r.id?'#fff':'var(--text3)',transition:'all .15s',
+            }}>{r.label}</button>
+          ))}
+        </div>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
         {gridVals.map(v=>{const y=PT+cH-(v-minY)/rangeY*cH;return<g key={v}><line x1={PL} y1={y} x2={W-PR} y2={y} stroke="var(--border)" strokeWidth={v===0?1.5:.5} strokeDasharray={v===0?'none':'3 3'}/><text x={PL-4} y={y+3} textAnchor="end" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{v>0?'+':''}{v}%</text></g>})}
@@ -342,6 +384,9 @@ function PerformanceChart({txs,prices}) {
         <path d={toPath(pfNorm)} fill="none" stroke="#58a6ff" strokeWidth={2} strokeLinejoin="round" strokeDasharray="5 3"/>
         {labelIdxs.map(i=>{const x=PL+i/Math.max(n-1,1)*cW;return<text key={i} x={x} y={H-4} textAnchor="middle" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{fmtD(spPoints[i]?.date)}</text>})}
       </svg>
+      <div style={{fontSize:9,color:'var(--text3)',textAlign:'right',marginTop:4,fontFamily:'var(--mono)'}}>
+        📊 prețuri istorice reale · {pfSymbols.length} simboluri
+      </div>
     </div>
   )
 }
