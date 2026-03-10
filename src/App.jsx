@@ -36,9 +36,7 @@ export default function App() {
   useEffect(() => {
     if (txs.length) {
       fetchRef.current()
-      // Fetch company info for all symbols
-      const syms = [...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol||t.sym).filter(Boolean))]
-      fetchCompanyInfo(syms)
+      // Company info introdusă manual — nu mai facem auto-fetch Yahoo (blocat CORS)
     }
   }, [txs.map(t => t.symbol).join(',')])
 
