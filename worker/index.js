@@ -80,6 +80,38 @@ export default {
       return json({ ok: true, data })
     }
 
+    // ── /history-multi?symbols=AAPL,MSFT&range=6mo ───────────
+    if (url.pathname === '/history-multi') {
+      const symsParam = url.searchParams.get('symbols') || ''
+      const range     = url.searchParams.get('range')   || '6mo'
+      const interval  = url.searchParams.get('interval')|| '1d'
+      const symbols   = symsParam.split(',').map(s => s.trim()).filter(Boolean)
+      if (!symbols.length) return json({ ok: false, error: 'no symbols' }, 400)
+
+      const cacheKey = `history-multi:${symbols.sort().join(',')}:${range}:${interval}`
+      if (env.KV) {
+        const cached = await env.KV.get(cacheKey)
+        if (cached) return json({ ok: true, histories: JSON.parse(cached), cached: true })
+      }
+
+      const results = await Promise.allSettled(
+        symbols.map(sym => fetchYahooHistory(sym, range, interval))
+      )
+
+      const histories = {}
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value) {
+          histories[symbols[i]] = r.value
+        }
+      })
+
+      if (env.KV && Object.keys(histories).length > 0) {
+        ctx.waitUntil(env.KV.put(cacheKey, JSON.stringify(histories), { expirationTtl: 300 }))
+      }
+
+      return json({ ok: true, histories })
+    }
+
     // ── /feargreed ────────────────────────────────────────────
     if (url.pathname === '/feargreed') {
       if (env.KV) {
