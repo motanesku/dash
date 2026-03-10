@@ -175,6 +175,9 @@ function MobileClosedCard({ p, companyInfo, isAdmin, onEditInfo }) {
     </div>
   )
 }
+
+// ── Aggregate positions with same symbol across brokers ───────
+function aggregateBySymbol(positions) {
   const map = {}
   positions.forEach(p => {
     if (!map[p.symbol]) {
