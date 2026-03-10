@@ -303,24 +303,26 @@ export default function Positions({ onEditTx }) {
   return (
     <div className="fade-up">
 
-      {/* Rând 1: Broker tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2,alignItems:'stretch'}}>
+      {/* Rând 1: Broker tabs + cash (desktop inline, mobile doar tabs) */}
+      <div style={{display:'flex',gap:6,marginBottom:isMobile?6:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,alignItems:'stretch'}}>
 
         {/* TOTAL tab */}
         <button onClick={()=>setBrokerTab(null)} style={{
-          display:'flex',flexDirection:'column',alignItems:'flex-start',padding:'10px 18px',borderRadius:8,
+          display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+          padding:isMobile?'6px 12px':'10px 18px',borderRadius:8,
           border:`2px solid ${!brokerTab?'var(--blue)':'var(--border2)'}`,
           background:!brokerTab?'var(--blue-bg)':'var(--surface)',
           color:!brokerTab?'var(--blue)':'var(--text3)',
-          cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',minWidth:90,flexShrink:0,
+          cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
+          minWidth:isMobile?0:90,flexShrink:isMobile?1:0,flex:isMobile?1:undefined,
         }}>
-          <div style={{display:'flex',alignItems:'center',gap:6}}>
-            <span style={{fontSize:13,fontWeight:700}}>TOTAL</span>
-            {totalCost>0 && <span className="mono" style={{fontSize:12,fontWeight:700,color:!brokerTab?'inherit':totalUnrealized>=0?'var(--green)':'var(--red)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{fontSize:isMobile?11:13,fontWeight:700}}>TOTAL</span>
+            {totalCost>0 && <span className="mono" style={{fontSize:isMobile?10:12,fontWeight:700,color:!brokerTab?'inherit':totalUnrealized>=0?'var(--green)':'var(--red)'}}>
               {totalUnrealized>=0?'+':''}{(totalUnrealized/totalCost*100).toFixed(1)}%
             </span>}
           </div>
-          <span style={{fontSize:10,color:!brokerTab?'inherit':'var(--text3)',fontWeight:500,marginTop:2}}>
+          <span style={{fontSize:isMobile?9:10,color:!brokerTab?'inherit':'var(--text3)',fontWeight:500,marginTop:1}}>
             {[...new Set(positions.map(p=>p.symbol))].length} tickere
           </span>
         </button>
@@ -332,65 +334,31 @@ export default function Positions({ onEditTx }) {
           const c = BROKER_COLORS[i%BROKER_COLORS.length]
           return (
             <button key={b} onClick={()=>setBrokerTab(b)} style={{
-              display:'flex',flexDirection:'column',alignItems:'flex-start',padding:'10px 18px',borderRadius:8,
+              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+              padding:isMobile?'6px 12px':'10px 18px',borderRadius:8,
               border:`2px solid ${active?c:'var(--border2)'}`,
               background:active?`${c}15`:'var(--surface)',
               color:active?c:'var(--text3)',
-              cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',minWidth:90,flexShrink:0,
+              cursor:'pointer',transition:'all .15s',whiteSpace:'nowrap',
+              minWidth:isMobile?0:90,flexShrink:isMobile?1:0,flex:isMobile?1:undefined,
             }}>
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{width:7,height:7,borderRadius:'50%',background:c,flexShrink:0}}/>
-                <span style={{fontSize:13,fontWeight:700}}>{b}</span>
-                {st?.roi!=null && <span className="mono" style={{fontSize:12,fontWeight:700,color:active?'inherit':st.roi>=0?'var(--green)':'var(--red)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:4}}>
+                <span style={{width:6,height:6,borderRadius:'50%',background:c,flexShrink:0}}/>
+                <span style={{fontSize:isMobile?11:13,fontWeight:700}}>{b}</span>
+                {st?.roi!=null && <span className="mono" style={{fontSize:isMobile?10:12,fontWeight:700,color:active?'inherit':st.roi>=0?'var(--green)':'var(--red)'}}>
                   {st.roi>=0?'+':''}{st.roi.toFixed(1)}%
                 </span>}
               </div>
-              <span style={{fontSize:10,color:active?'inherit':'var(--text3)',fontWeight:500,marginTop:2,marginLeft:13}}>
+              <span style={{fontSize:isMobile?9:10,color:active?'inherit':'var(--text3)',fontWeight:500,marginTop:1}}>
                 {st?.count||0} tickere
               </span>
             </button>
           )
         })}
-      </div>
 
-      {/* Rând 2: Cash cards (doar pe mobile — pe desktop sunt în rândul 1 după separator) */}
-      {isMobile && (
-        <div style={{display:'flex',gap:6,marginBottom:14}}>
-          {/* Cash Total */}
-          <div style={{
-            flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'8px 14px',
-            background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',borderRadius:8,
-          }}>
-            <div style={{fontSize:9,color:'rgba(240,180,41,0.7)',fontWeight:600,marginBottom:2}}>💵 CASH TOTAL</div>
-            <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:13}}>{fmtC(totalCash)}</div>
-          </div>
-          {/* Cash pe broker */}
-          {brokers.map((b,i) => {
-            const cash = cashByBroker[b] || 0
-            if (cash === 0) return null
-            const c = BROKER_COLORS[i%BROKER_COLORS.length]
-            return (
-              <div key={b} style={{
-                flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'8px 14px',
-                background:'var(--surface)',border:`1px solid ${c}40`,borderRadius:8,
-              }}>
-                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
-                  <span style={{width:6,height:6,borderRadius:'50%',background:c,flexShrink:0}}/>
-                  <span style={{fontSize:9,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
-                </div>
-                <div className="mono" style={{fontWeight:600,fontSize:13,color:c}}>{fmtC(cash)}</div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Pe desktop: cash în continuarea tab-urilor */}
-      {!isMobile && (
-        <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,alignItems:'stretch'}}>
-          {/* Separator */}
-          <div style={{width:1,background:'var(--border2)',margin:'4px 0',flexShrink:0}}/>
-          {/* Cash Total */}
+        {/* Desktop: separator + cash inline */}
+        {!isMobile && <>
+          <div style={{width:1,background:'var(--border2)',margin:'4px 6px',flexShrink:0}}/>
           <div style={{
             display:'flex',flexDirection:'column',justifyContent:'center',padding:'10px 18px',
             background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',
@@ -414,6 +382,36 @@ export default function Positions({ onEditTx }) {
                   <span style={{fontSize:10,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
                 </div>
                 <div className="mono" style={{fontWeight:600,fontSize:14,color:c}}>{fmtC(cash)}</div>
+              </div>
+            )
+          })}
+        </>}
+      </div>
+
+      {/* Rând 2: Cash cards — doar pe mobile */}
+      {isMobile && (
+        <div style={{display:'flex',gap:6,marginBottom:14}}>
+          <div style={{
+            flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'6px 10px',
+            background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',borderRadius:8,
+          }}>
+            <div style={{fontSize:9,color:'rgba(240,180,41,0.7)',fontWeight:600,marginBottom:1}}>💵 CASH TOTAL</div>
+            <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:12}}>{fmtC(totalCash)}</div>
+          </div>
+          {brokers.map((b,i) => {
+            const cash = cashByBroker[b] || 0
+            if (cash === 0) return null
+            const c = BROKER_COLORS[i%BROKER_COLORS.length]
+            return (
+              <div key={b} style={{
+                flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'6px 10px',
+                background:'var(--surface)',border:`1px solid ${c}40`,borderRadius:8,
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:1}}>
+                  <span style={{width:5,height:5,borderRadius:'50%',background:c,flexShrink:0}}/>
+                  <span style={{fontSize:9,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
+                </div>
+                <div className="mono" style={{fontWeight:600,fontSize:12,color:c}}>{fmtC(cash)}</div>
               </div>
             )
           })}
