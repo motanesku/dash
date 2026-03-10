@@ -110,6 +110,40 @@ export async function fetchHistory(symbol, range = '3mo') {
   } catch { return []; }
 }
 
+// ── Fetch history for multiple symbols in one Worker call ──
+export async function fetchHistoryMulti(symbols, range = '6mo') {
+  if (!symbols.length) return {};
+  if (USE_WORKER) {
+    try {
+      const url = `${WORKER_URL}/api/history-multi?symbols=${encodeURIComponent(symbols.join(','))}&range=${range}`;
+      const r = await fetchWithTimeout(url, 20000);
+      const j = await r.json();
+      if (j.ok && j.histories) {
+        // Normalize: add date string to each point
+        const out = {};
+        for (const [sym, pts] of Object.entries(j.histories)) {
+          out[sym] = pts.map(p => ({
+            ...p,
+            date: new Date((p.time || p.date) * (typeof p.time === 'number' && p.time > 1e10 ? 1 : 1000))
+              .toISOString().split('T')[0],
+            close: p.close,
+          })).filter(p => p.close != null);
+        }
+        return out;
+      }
+    } catch (e) {
+      console.warn('fetchHistoryMulti worker failed:', e.message);
+    }
+  }
+  // Fallback: fetch one by one via fetchHistory
+  const entries = await Promise.allSettled(symbols.map(s => fetchHistory(s, range)));
+  const out = {};
+  entries.forEach((r, i) => {
+    if (r.status === 'fulfilled' && r.value?.length) out[symbols[i]] = r.value;
+  });
+  return out;
+}
+
 export async function fetchFearGreed() {
   // Fetch crypto from Worker (alternative.me) + CNN directly from browser in parallel
   const [cryptoResult, cnnResult] = await Promise.allSettled([

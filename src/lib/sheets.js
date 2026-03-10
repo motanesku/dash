@@ -115,6 +115,24 @@ export function saveAlerts(alerts) {
   try { localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts)); } catch {}
 }
 
+// Sync alerts to/from cloud (Google Sheets)
+export async function syncAlertsToCloud(alerts) {
+  if (!USE_CLOUD) return;
+  try {
+    await sheetsPost({ action: 'saveAlerts', data: alerts });
+  } catch (e) { console.warn('Cloud saveAlerts failed:', e.message); }
+}
+
+export async function loadAlertsFromCloud() {
+  if (!USE_CLOUD) return null;
+  try {
+    const r = await fetch(SHEETS_URL + '?action=getAlerts');
+    const j = await r.json();
+    if (j.ok && Array.isArray(j.data)) return j.data;
+  } catch (e) { console.warn('Cloud loadAlerts failed:', e.message); }
+  return null;
+}
+
 // ── Excel Import ───────────────────────────────────────────
 export function parseImportFile(file, cb) {
   import('xlsx').then(({ default: XLSX }) => {

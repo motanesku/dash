@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { fetchPrices, fetchFearGreed, MARKET_SYMBOLS, ALL_MARKET_SYMBOLS } from './prices.js';
 import { calcPortfolio } from './portfolio.js';
-import { loadTransactions, saveTransactionsLocal, syncTransactionsToCloud, loadBrokers, saveBrokers, loadAlerts, saveAlerts, loadClub, saveClub } from './sheets.js';
+import { loadTransactions, saveTransactionsLocal, syncTransactionsToCloud, loadBrokers, saveBrokers, loadAlerts, loadClub, saveClub } from './sheets.js';
 
 const PRICES_CACHE_KEY = 'ptf_v6_prices';
 const MARKET_CACHE_KEY = 'ptf_v6_market';
@@ -285,16 +285,53 @@ const useStore = create((set, get) => ({
 
   // ── Price Alerts ─────────────────────────────────────────
   alerts: loadAlerts(),
-  addAlert: (alert) => {
-    const next = [...get().alerts, { ...alert, id: Date.now(), triggered: false }];
-    set({ alerts: next }); saveAlerts(next);
+
+  // Per-device notification toggle — nu se sincronizează în cloud
+  notificationsEnabled: (() => {
+    try { return localStorage.getItem('ptf_v6_notif') !== 'false'; } catch { return true; }
+  })(),
+  toggleNotifications: () => {
+    const next = !useStore.getState().notificationsEnabled;
+    try { localStorage.setItem('ptf_v6_notif', String(next)); } catch {}
+    set({ notificationsEnabled: next });
   },
-  deleteAlert: (id) => {
+
+  loadAlerts: async () => {
+    // Încarcă din cloud (source of truth), fallback la localStorage
+    const { loadAlertsFromCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const cloudAlerts = await loadAlertsFromCloud();
+    if (cloudAlerts && cloudAlerts.length > 0) {
+      set({ alerts: cloudAlerts });
+      saveLocal(cloudAlerts);
+    }
+    // dacă cloud e gol, rămânem cu ce avem din localStorage (deja setat la init)
+  },
+
+  addAlert: async (alert) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const next = [...get().alerts, { ...alert, id: Date.now(), triggered: false, triggeredAt: null }];
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
+  },
+  deleteAlert: async (id) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
     const next = get().alerts.filter(a => a.id !== id);
-    set({ alerts: next }); saveAlerts(next);
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
   },
-  checkAlerts: (prices) => {
+  clearTriggeredAlerts: async () => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const next = get().alerts.filter(a => !a.triggered);
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
+  },
+  checkAlerts: async (prices) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
     const alerts = get().alerts;
+    const notifEnabled = get().notificationsEnabled;
     let changed = false;
     const next = alerts.map(a => {
       if (a.triggered) return a;
@@ -303,7 +340,8 @@ const useStore = create((set, get) => ({
       const hit = a.direction === 'above' ? p >= a.target : p <= a.target;
       if (hit) {
         changed = true;
-        if (Notification.permission === 'granted') {
+        // Notificare doar dacă device-ul are notificările activate
+        if (notifEnabled && Notification.permission === 'granted') {
           new Notification(`📈 Alert: ${a.symbol}`, {
             body: `Prețul a ajuns la ${p.toFixed(2)} (target: ${a.target})`,
           });
@@ -312,7 +350,11 @@ const useStore = create((set, get) => ({
       }
       return a;
     });
-    if (changed) { set({ alerts: next }); saveAlerts(next); }
+    if (changed) {
+      set({ alerts: next });
+      saveLocal(next);
+      await syncAlertsToCloud(next); // sync starea triggered în cloud
+    }
   },
 }));
 
