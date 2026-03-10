@@ -189,7 +189,7 @@ function MobileClosedCard({ p, companyInfo, isAdmin, onEditInfo }) {
           <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:profitColor}}>
             {fmtPct(p.roi)}
           </div>
-          <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{p.lastDate ? `închis ${p.lastDate}` : ''}</div>
+          <div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>{p.lastDate ? `închis ${fmtDate(p.lastDate)}` : ''}</div>
         </div>
       </div>
 
@@ -303,8 +303,8 @@ export default function Positions({ onEditTx }) {
   return (
     <div className="fade-up">
 
-      {/* Broker tabs + Cash — un singur rând */}
-      <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,alignItems:'stretch'}}>
+      {/* Rând 1: Broker tabs */}
+      <div style={{display:'flex',gap:6,marginBottom:6,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:2,alignItems:'stretch'}}>
 
         {/* TOTAL tab */}
         <button onClick={()=>setBrokerTab(null)} style={{
@@ -351,40 +351,74 @@ export default function Positions({ onEditTx }) {
             </button>
           )
         })}
-
-        {/* Separator */}
-        <div style={{width:1,background:'var(--border2)',margin:'4px 6px',flexShrink:0}}/>
-
-        {/* Cash Total */}
-        <div style={{
-          display:'flex',flexDirection:'column',justifyContent:'center',padding:'10px 18px',
-          background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',
-          borderRadius:8,flexShrink:0,minWidth:90,
-        }}>
-          <div style={{fontSize:10,color:'rgba(240,180,41,0.7)',fontWeight:600,marginBottom:2}}>💵 CASH TOTAL</div>
-          <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:14}}>{fmtC(totalCash)}</div>
-        </div>
-
-        {/* Cash pe broker */}
-        {brokers.map((b,i) => {
-          const cash = cashByBroker[b] || 0
-          if (cash === 0) return null
-          const c = BROKER_COLORS[i%BROKER_COLORS.length]
-          return (
-            <div key={b} style={{
-              display:'flex',flexDirection:'column',justifyContent:'center',padding:'10px 18px',
-              background:'var(--surface)',border:`1px solid ${c}40`,
-              borderRadius:8,flexShrink:0,minWidth:90,
-            }}>
-              <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
-                <span style={{width:6,height:6,borderRadius:'50%',background:c,flexShrink:0}}/>
-                <span style={{fontSize:10,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
-              </div>
-              <div className="mono" style={{fontWeight:600,fontSize:14,color:c}}>{fmtC(cash)}</div>
-            </div>
-          )
-        })}
       </div>
+
+      {/* Rând 2: Cash cards (doar pe mobile — pe desktop sunt în rândul 1 după separator) */}
+      {isMobile && (
+        <div style={{display:'flex',gap:6,marginBottom:14}}>
+          {/* Cash Total */}
+          <div style={{
+            flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'8px 14px',
+            background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',borderRadius:8,
+          }}>
+            <div style={{fontSize:9,color:'rgba(240,180,41,0.7)',fontWeight:600,marginBottom:2}}>💵 CASH TOTAL</div>
+            <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:13}}>{fmtC(totalCash)}</div>
+          </div>
+          {/* Cash pe broker */}
+          {brokers.map((b,i) => {
+            const cash = cashByBroker[b] || 0
+            if (cash === 0) return null
+            const c = BROKER_COLORS[i%BROKER_COLORS.length]
+            return (
+              <div key={b} style={{
+                flex:1,display:'flex',flexDirection:'column',justifyContent:'center',padding:'8px 14px',
+                background:'var(--surface)',border:`1px solid ${c}40`,borderRadius:8,
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
+                  <span style={{width:6,height:6,borderRadius:'50%',background:c,flexShrink:0}}/>
+                  <span style={{fontSize:9,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
+                </div>
+                <div className="mono" style={{fontWeight:600,fontSize:13,color:c}}>{fmtC(cash)}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pe desktop: cash în continuarea tab-urilor */}
+      {!isMobile && (
+        <div style={{display:'flex',gap:6,marginBottom:14,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,alignItems:'stretch'}}>
+          {/* Separator */}
+          <div style={{width:1,background:'var(--border2)',margin:'4px 0',flexShrink:0}}/>
+          {/* Cash Total */}
+          <div style={{
+            display:'flex',flexDirection:'column',justifyContent:'center',padding:'10px 18px',
+            background:'var(--gold-bg)',border:'1px solid rgba(240,180,41,0.25)',
+            borderRadius:8,flexShrink:0,minWidth:90,
+          }}>
+            <div style={{fontSize:10,color:'rgba(240,180,41,0.7)',fontWeight:600,marginBottom:2}}>💵 CASH TOTAL</div>
+            <div className="mono" style={{fontWeight:700,color:'var(--gold)',fontSize:14}}>{fmtC(totalCash)}</div>
+          </div>
+          {brokers.map((b,i) => {
+            const cash = cashByBroker[b] || 0
+            if (cash === 0) return null
+            const c = BROKER_COLORS[i%BROKER_COLORS.length]
+            return (
+              <div key={b} style={{
+                display:'flex',flexDirection:'column',justifyContent:'center',padding:'10px 18px',
+                background:'var(--surface)',border:`1px solid ${c}40`,
+                borderRadius:8,flexShrink:0,minWidth:90,
+              }}>
+                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:2}}>
+                  <span style={{width:6,height:6,borderRadius:'50%',background:c,flexShrink:0}}/>
+                  <span style={{fontSize:10,color:'var(--text3)',fontWeight:600}}>{b} · CASH</span>
+                </div>
+                <div className="mono" style={{fontWeight:600,fontSize:14,color:c}}>{fmtC(cash)}</div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Open / Closed toggle + sort */}
       <div style={{display:'flex',gap:6,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
