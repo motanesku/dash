@@ -96,9 +96,9 @@ function StatCard({label,value,sub,subClass,accent,delay=0}) {
 // ── Sector Pie Chart ──────────────────────────────────────────
 const SECTOR_COLORS = {
   // GICS standard
-  'Technology':'#58a6ff','Healthcare':'#a78bfa','Financials':'#00d4aa',
+  'Technology':'#58a6ff','Healthcare':'#a78bfa','Financials':'#f70c0c',
   'Energy':'#f0b429','Consumer Discretionary':'#ff5572','Consumer Staples':'#fb7185',
-  'Industrials':'#34d399','Materials':'#fb923c','Utilities':'#60a5fa',
+  'Industrials':'#34d399','Materials':'#fb923c','Utilities':'#fff958',
   'Real Estate':'#f472b6','Communication Services':'#a3e635',
   // legacy
   'Tech':'#58a6ff','Finance':'#00d4aa','Health':'#a78bfa',
