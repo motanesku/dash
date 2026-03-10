@@ -40,8 +40,8 @@ async function fetchFearGreedWorker() {
   const r = await fetchWithTimeout(url, 6000);
   const j = await r.json();
   if (!j.ok) throw new Error(j.error);
-  // Workerul returnează { ok, crypto, stock }
-  return { crypto: j.crypto || null, stock: j.stock || null };
+  // Workerul returnează { ok, crypto, stock, vix }
+  return { crypto: j.crypto || null, stock: j.stock || null, vix: j.vix || null };
 }
 
 // ── Fallback: direct Yahoo via CORS proxy ──────────────────
@@ -242,4 +242,3 @@ export async function fetchCompanyInfo(symbols) {
 
   return info;
 }
-
