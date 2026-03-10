@@ -72,11 +72,15 @@ export function calcPortfolio(txs, prices) {
       const [broker, symbol] = key.split('::');
       const nameTx = sorted.find(t => t.symbol === symbol && t.broker === broker);
       const name = nameTx?.name || prices[symbol]?.name || '';
-      const totalProfit = trades.reduce((s,t) => s+t.profit, 0);
-      const totalCost   = trades.reduce((s,t) => s+t.buyPrice*t.shares, 0);
-      const totalShares = trades.reduce((s,t) => s+t.shares, 0);
+      const totalProfit  = trades.reduce((s,t) => s+t.profit, 0);
+      const totalCost    = trades.reduce((s,t) => s+t.buyPrice*t.shares, 0);
+      const totalShares  = trades.reduce((s,t) => s+t.shares, 0);
+      const totalRevenue = trades.reduce((s,t) => s+t.sellPrice*t.shares, 0);
+      const avgBuyPrice  = totalShares > 0 ? totalCost / totalShares : 0;
+      const avgSellPrice = totalShares > 0 ? totalRevenue / totalShares : 0;
       return {
         symbol, broker, trades, totalProfit, totalCost, totalShares,
+        totalRevenue, avgBuyPrice, avgSellPrice,
         roi:      totalCost > 0 ? (totalProfit/totalCost)*100 : 0,
         lastDate: trades[trades.length-1]?.sellDate,
         name,
