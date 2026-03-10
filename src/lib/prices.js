@@ -241,23 +241,15 @@ export async function fetchCompanyInfo(symbols) {
   if (!symbols.length) return {};
   const info = {};
 
-  // Yahoo v7/finance/quote — funcționează din browser, nu din Workers
+  // Prin Worker — evită CORS block de la browser direct la Yahoo
   try {
     const symsStr = symbols.map(s => encodeURIComponent(s)).join(',');
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symsStr}&fields=shortName,longName,sector,industry,marketCap,quoteType`;
+    const url = `${WORKER_URL}/api/info?symbols=${symsStr}`;
     const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
     const j = await r.json();
-    const results = j?.quoteResponse?.result || [];
-    results.forEach(q => {
-      if (!q.symbol) return;
-      info[q.symbol] = {
-        sector:   q.sector   || '',
-        industry: q.industry || '',
-        domain:   q.industry || q.sector || '',
-        cap:      capFromMarketCap(q.marketCap),
-        name:     q.shortName || q.longName || '',
-      };
-    });
+    if (j?.ok && j.info) {
+      Object.assign(info, j.info);
+    }
   } catch {}
 
   // Fill missing
