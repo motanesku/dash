@@ -144,6 +144,7 @@ export function pnlClass(n) {
 export function fmtDate(d) {
   if (!d) return '—';
   try {
+    // Handle ISO timestamp like "2026-01-20T22:00:00.000Z"
     const s = String(d).slice(0,10);
     const [y,m,day] = s.split('-');
     if (!y||!m||!day) return String(d).slice(0,10);
