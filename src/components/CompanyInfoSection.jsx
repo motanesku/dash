@@ -31,11 +31,10 @@ export const INDUSTRIES_BY_SECTOR = {
   'Communication Services': ['Telecom','Media','Social Media','Gaming','Streaming'],
 }
 
-export const CAPS = ['Mega Cap','Large Cap','Mid Cap','Small Cap','Micro Cap']
+export const CAPS = ['Large Cap','Mid Cap','Small Cap']
 
 export const CAP_COLORS = {
-  'Mega Cap':'#a78bfa','Large Cap':'var(--blue)','Mid Cap':'var(--green)',
-  'Small Cap':'var(--gold)','Micro Cap':'var(--red)',
+  'Large Cap':'var(--blue)','Mid Cap':'var(--green)','Small Cap':'var(--gold)',
 }
 
 // ── CompanyInfoSection ────────────────────────────────────────
