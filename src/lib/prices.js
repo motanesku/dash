@@ -39,8 +39,9 @@ async function fetchFearGreedWorker() {
   const url = `${WORKER_URL}/api/feargreed`;
   const r = await fetchWithTimeout(url, 6000);
   const j = await r.json();
-  if (j.ok) return { value: j.value, label: j.label };
-  throw new Error(j.error);
+  if (!j.ok) throw new Error(j.error);
+  // Workerul returnează { ok, crypto, stock }
+  return { crypto: j.crypto || null, stock: j.stock || null };
 }
 
 // ── Fallback: direct Yahoo via CORS proxy ──────────────────
@@ -151,7 +152,7 @@ export async function fetchFearGreed() {
       if (USE_WORKER) {
         try {
           const r = await fetchFearGreedWorker();
-          if (r?.ok && r.crypto?.value != null) return r.crypto;
+          if (r?.crypto?.value != null) return r.crypto;
         } catch {}
       }
       // Fallback: direct
@@ -259,3 +260,4 @@ export async function fetchCompanyInfo(symbols) {
 
   return info;
 }
+
