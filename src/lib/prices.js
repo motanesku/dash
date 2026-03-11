@@ -150,7 +150,7 @@ export async function fetchFearGreed() {
   if (USE_WORKER) {
     try {
       const r = await fetchFearGreedWorker();
-      if (r?.crypto || r?.stock) return r;
+      if (r?.crypto || r?.stock || r?.vix) return r;
     } catch {}
   }
   // Fallback: doar crypto direct (CNN blochează din browser)
@@ -166,6 +166,7 @@ export async function fetchFearGreed() {
         history: arr.map(x => ({ date: new Date(+x.timestamp*1000).toISOString().split('T')[0], value: +x.value })).reverse(),
       },
       stock: null,
+      vix: null,
     };
   } catch {}
   return null;
