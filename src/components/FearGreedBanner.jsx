@@ -31,6 +31,20 @@ function getVixLabel(v) {
   return 'Extreme Fear'
 }
 
+// Sageata tendinta — invertita pentru VIX (scadere = bine = verde)
+function Arrow({ current, prev, invert = false }) {
+  if (current == null || prev == null) return null
+  const up = current > prev
+  const isPositive = invert ? !up : up
+  const color = isPositive ? '#34d399' : '#ff5572'
+  const symbol = up ? '▲' : '▼'
+  return (
+    <span style={{ fontSize: 11, color, fontWeight: 700, lineHeight: 1, marginLeft: 2 }}>
+      {symbol}
+    </span>
+  )
+}
+
 function Bar({ pct, gradient, color }) {
   if (pct == null) return (
     <div style={{height:5,borderRadius:3,background:'var(--border)',width:'100%'}}/>
@@ -47,7 +61,7 @@ function Bar({ pct, gradient, color }) {
   )
 }
 
-function Card({ icon, title, number, label, color, barPct, barGradient }) {
+function Card({ icon, title, number, label, color, barPct, barGradient, arrow }) {
   return (
     <div style={{
       flex:'1 1 0', minWidth:0,
@@ -57,7 +71,6 @@ function Card({ icon, title, number, label, color, barPct, barGradient }) {
       padding:'8px 10px',
       display:'flex', flexDirection:'column', gap:4,
     }}>
-      {/* Titlu card */}
       <div style={{display:'flex',alignItems:'center',gap:4}}>
         <span style={{fontSize:13}}>{icon}</span>
         <span style={{fontSize:10,color:'var(--text3)',fontWeight:700,letterSpacing:.3}}>
@@ -65,8 +78,7 @@ function Card({ icon, title, number, label, color, barPct, barGradient }) {
         </span>
       </div>
 
-      {/* Număr mare */}
-      <div style={{display:'flex',alignItems:'baseline',gap:3}}>
+      <div style={{display:'flex',alignItems:'baseline',gap:2}}>
         <span style={{
           fontFamily:'var(--mono)', fontWeight:800, lineHeight:1,
           fontSize:'clamp(22px,5vw,30px)',
@@ -74,12 +86,11 @@ function Card({ icon, title, number, label, color, barPct, barGradient }) {
         }}>
           {number ?? '—'}
         </span>
+        {arrow}
       </div>
 
-      {/* Bară */}
       <Bar pct={barPct} gradient={barGradient} color={color}/>
 
-      {/* Label sub bară */}
       <div style={{fontSize:9,fontWeight:700,color,letterSpacing:.3,marginTop:1}}>
         {label ?? '—'}
       </div>
@@ -88,15 +99,22 @@ function Card({ icon, title, number, label, color, barPct, barGradient }) {
 }
 
 export default function FearGreedBanner({ fearGreed, vix }) {
-  const cryptoVal = fearGreed?.crypto?.value ?? fearGreed?.value ?? null
-  const stockVal  = fearGreed?.stock?.value ?? null
+  const cryptoVal  = fearGreed?.crypto?.value ?? fearGreed?.value ?? null
+  const cryptoPrev = fearGreed?.crypto?.history?.length >= 2
+    ? fearGreed.crypto.history[fearGreed.crypto.history.length - 2]?.value
+    : null
 
-  const fgGradient = 'linear-gradient(to right,#ff2d55 0%,#ff6b35 25%,#f0b429 45%,#34d399 55%,#00d4aa 100%)'
+  const stockVal  = fearGreed?.stock?.value ?? null
+  const stockPrev = fearGreed?.stock?.prev_close ?? null
+
+  const vixPrice = vix ?? fearGreed?.vix?.price ?? null
+  const vixPrev  = fearGreed?.vix?.prev ?? null
+
+  const fgGradient  = 'linear-gradient(to right,#ff2d55 0%,#ff6b35 25%,#f0b429 45%,#34d399 55%,#00d4aa 100%)'
   const vixGradient = 'linear-gradient(to right,#00d4aa 0%,#34d399 30%,#f0b429 50%,#ff6b35 70%,#ff2d55 100%)'
 
   return (
     <div style={{marginBottom:16}}>
-      {/* Titlu general */}
       <div style={{
         fontSize:9,fontWeight:700,color:'var(--text3)',
         letterSpacing:1.2,marginBottom:6,paddingLeft:2,
@@ -104,7 +122,6 @@ export default function FearGreedBanner({ fearGreed, vix }) {
         FEAR &amp; GREED
       </div>
 
-      {/* 3 carduri */}
       <div style={{display:'flex',gap:8,flexWrap:'nowrap'}}>
         <Card
           icon="📈" title="Stocks (CNN)"
@@ -113,6 +130,7 @@ export default function FearGreedBanner({ fearGreed, vix }) {
           label={getFGLabel(stockVal)}
           barPct={stockVal}
           barGradient={fgGradient}
+          arrow={<Arrow current={stockVal} prev={stockPrev} />}
         />
         <Card
           icon="₿" title="Crypto"
@@ -121,16 +139,19 @@ export default function FearGreedBanner({ fearGreed, vix }) {
           label={getFGLabel(cryptoVal)}
           barPct={cryptoVal}
           barGradient={fgGradient}
+          arrow={<Arrow current={cryptoVal} prev={cryptoPrev} />}
         />
         <Card
           icon="📊" title="VIX"
-          number={vix != null ? vix.toFixed(1) : null}
-          color={getVixColor(vix)}
-          label={getVixLabel(vix)}
-          barPct={vix != null ? Math.min((vix/50)*100, 100) : null}
+          number={vixPrice != null ? vixPrice.toFixed(1) : null}
+          color={getVixColor(vixPrice)}
+          label={getVixLabel(vixPrice)}
+          barPct={vixPrice != null ? Math.min((vixPrice/50)*100, 100) : null}
           barGradient={vixGradient}
+          arrow={<Arrow current={vixPrice} prev={vixPrev} invert={true} />}
         />
       </div>
     </div>
   )
 }
+
