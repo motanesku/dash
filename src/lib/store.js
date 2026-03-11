@@ -147,6 +147,11 @@ const useStore = create((set, get) => ({
       portfolioSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       foxSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       marketSyms.forEach(s => { if (allPrices[s]) marketData[s] = allPrices[s]; });
+      // Păstrează VIX din feargreed dacă /api/prices nu l-a returnat
+      const existingVix = get().marketData['^VIX'];
+      if (!marketData['^VIX'] && existingVix?.price != null) {
+        marketData['^VIX'] = existingVix;
+      }
       set({ prices, marketData, pricesLoading: false, pricesUpdated: new Date() });
       // Cache for next visit
       writeCache(PRICES_CACHE_KEY, prices);
@@ -373,3 +378,4 @@ const useStore = create((set, get) => ({
 }));
 
 export default useStore;
+
