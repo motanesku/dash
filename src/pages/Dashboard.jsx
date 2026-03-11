@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
+import { requestNotificationPermission, checkPriceAlerts } from '../lib/notifications.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
@@ -409,6 +410,22 @@ export default function Dashboard() {
   const hasCachedData=Object.keys(prices).length>0||txs.length>0
   const isFirstLoad=cloudLoading&&!hasCachedData
   const [chartTab,setChartTab]=useState('perf')
+  const [notifPerm, setNotifPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+
+  // Verifică alerte de preț la fiecare update de prețuri
+  useEffect(() => {
+    if (notifPerm !== 'granted') return;
+    const alerts = txs
+      .filter(t => t.targetPrice || t.stopLoss)
+      .map(t => ({ sym: t.sym, targetPrice: t.targetPrice, stopLoss: t.stopLoss }))
+      .filter((v, i, a) => a.findIndex(x => x.sym === v.sym) === i); // unic per simbol
+    checkPriceAlerts(prices, alerts);
+  }, [prices]);
+
+  async function handleEnableNotif() {
+    const perm = await requestNotificationPermission();
+    setNotifPerm(perm);
+  }
 
   const {positions,closedPositions,cashByBroker}=useMemo(()=>calcPortfolio(txs,prices),[txs,prices])
   const agg=useMemo(()=>aggregatePositions(positions,closedPositions),[positions,closedPositions])
@@ -425,6 +442,20 @@ export default function Dashboard() {
 
   return(
     <div className="fade-up">
+      {/* Buton activare notificări */}
+      {notifPerm === 'default' && 'Notification' in window && (
+        <div onClick={handleEnableNotif} style={{
+          position:'fixed', bottom:20, left:20, zIndex:99,
+          background:'var(--surface)', border:'1px solid var(--border2)',
+          borderRadius:8, padding:'8px 14px',
+          display:'flex', alignItems:'center', gap:8,
+          fontSize:11, color:'var(--text2)', fontFamily:'var(--mono)',
+          boxShadow:'var(--shadow)', cursor:'pointer',
+        }}>
+          🔔 Activează notificări
+        </div>
+      )}
+
       {pricesLoading&&hasCachedData&&(
         <div style={{position:'fixed',bottom:20,right:20,zIndex:99,background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)',boxShadow:'var(--shadow)'}}>
           <span style={{animation:'pulse 1s infinite',display:'inline-block'}}>⟳</span> actualizare...
