@@ -146,30 +146,33 @@ export async function fetchHistoryMulti(symbols, range = '6mo') {
 }
 
 export async function fetchFearGreed() {
-  // Tot prin worker — un singur call, evită race condition și CORS issues Firefox/mobile
-  if (USE_WORKER) {
-    try {
-      const r = await fetchFearGreedWorker();
-      if (r?.crypto || r?.stock || r?.vix) return r;
-    } catch {}
-  }
-  // Fallback: doar crypto direct (CNN blochează din browser)
-  try {
-    const r = await fetchWithTimeout('https://api.alternative.me/fng/?limit=30', 5000);
-    const j = await r.json();
-    const arr = j?.data || [];
-    if (!arr.length) return null;
-    return {
-      crypto: {
-        value: +arr[0].value,
-        label: arr[0].value_classification,
-        history: arr.map(x => ({ date: new Date(+x.timestamp*1000).toISOString().split('T')[0], value: +x.value })).reverse(),
-      },
-      stock: null,
-      vix: null,
-    };
-  } catch {}
-  return null;
+  // Worker: crypto + vix
+  // Browser direct: CNN stock (Cloudflare IP-urile sunt blocate de CNN)
+  const [workerResult, cnnResult] = await Promise.allSettled([
+    USE_WORKER ? fetchFearGreedWorker() : Promise.reject('no worker'),
+    (async () => {
+      const r = await fetchWithTimeout('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', 6000);
+      const d = await r.json();
+      const fg = d?.fear_and_greed;
+      if (!fg?.score) return null;
+      const ratingMap = {'extreme_fear':'Extreme Fear','fear':'Fear','neutral':'Neutral','greed':'Greed','extreme_greed':'Extreme Greed'};
+      return {
+        value: Math.round(fg.score),
+        label: ratingMap[fg.rating] || fg.rating || '',
+        prev_close: fg.previous_close ? Math.round(fg.previous_close) : null,
+      };
+    })(),
+  ]);
+
+  const worker = workerResult.status === 'fulfilled' ? workerResult.value : {};
+  const stock  = cnnResult.status === 'fulfilled' ? cnnResult.value : null;
+
+  if (!worker.crypto && !stock && !worker.vix) return null;
+  return {
+    crypto: worker.crypto || null,
+    stock,
+    vix: worker.vix || null,
+  };
 }
 
 // Symbols shown as market cards (VIX excluded - shown in status bar instead)
