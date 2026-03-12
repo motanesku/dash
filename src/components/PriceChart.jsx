@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { fetchHistory } from '../lib/prices.js'
 
-export default function PriceChart({ symbol, height = 200, showVolume = false }) {
+export default function PriceChart({ symbol, height = 200, showVolume = false, avgPrice = null }) {
   const containerRef = useRef(null)
   const chartRef = useRef(null)
   const seriesRef = useRef(null)
+  const avgLineRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [range, setRange] = useState('3mo')
@@ -19,6 +20,8 @@ export default function PriceChart({ symbol, height = 200, showVolume = false })
         if (chartRef.current) {
           chartRef.current.remove()
           chartRef.current = null
+          seriesRef.current = null
+          avgLineRef.current = null
         }
         chart = createChart(containerRef.current, {
           width: containerRef.current.clientWidth,
@@ -70,11 +73,30 @@ export default function PriceChart({ symbol, height = 200, showVolume = false })
 
         const data = points.map(p => ({ time: p.date, value: p.close }))
         series.setData(data)
+
+        // Linie avg price — portocalie punctată
+        if (avgPrice != null && points.length >= 2) {
+          const avgSeries = chart.addLineSeries({
+            color: '#f0b429',
+            lineWidth: 1,
+            lineStyle: 2, // 2 = dashed
+            crosshairMarkerVisible: false,
+            lastValueVisible: true,
+            priceLineVisible: false,
+            title: `AVG ${avgPrice.toFixed(2)}`,
+          })
+          avgLineRef.current = avgSeries
+          // Linie orizontală de la prima la ultima dată
+          avgSeries.setData([
+            { time: points[0].date,                  value: avgPrice },
+            { time: points[points.length - 1].date,  value: avgPrice },
+          ])
+        }
+
         chart.timeScale().fitContent()
         setLoading(false)
         setError(null)
 
-        // Resize observer
         const ro = new ResizeObserver(() => {
           if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth })
         })
@@ -88,7 +110,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false })
 
     init()
     return () => { if (chartRef.current) { chartRef.current.remove(); chartRef.current = null } }
-  }, [symbol, range, height])
+  }, [symbol, range, height, avgPrice])
 
   const RANGES = [
     { v:'1mo', l:'1L' },
