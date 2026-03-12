@@ -72,7 +72,7 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
         borderRadius:selected?'12px 12px 0 0':12,padding:'14px 16px',
         borderLeft:`3px solid ${unrColor}`,transition:'all .15s',
       }}>
-        {/* Rând 1 — Header */}
+        {/* Rând 1 — Symbol | DayChange | Profit | ROI */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
           <div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -93,7 +93,7 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
               ))}
             </div>
           </div>
-          {/* Valoare + unrealized + alert */}
+          {/* Profit + ROI + alert */}
           <div style={{textAlign:'right'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6}}>
               <button
@@ -106,29 +106,29 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
                   opacity: (() => { const a=alerts?.[p.symbol]; return a&&(a.targetPrice||a.stopLoss||a.dayChangePct||a.vixPrag)?1:0.4; })(),
                 }}
               >🔔</button>
-              <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
-                {p.curValue ? fmtC(p.curValue, p.currency) : '—'}
+              <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:unrColor}}>
+                {p.unrealizedPnl!=null ? fmtC(p.unrealizedPnl,p.currency) : '—'}
               </div>
             </div>
-            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:unrColor}}>
-              {p.unrealizedPnl!=null ? fmtC(p.unrealizedPnl,p.currency) : '—'}
-            </div>
-            <div style={{fontFamily:'var(--mono)',fontSize:11,color:unrColor}}>
+            <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:600,color:unrColor}}>
               {p.unrealizedPct!=null ? fmtPct(p.unrealizedPct) : ''}
             </div>
           </div>
         </div>
 
-        {/* Rând 2 — CAP | — | Current Price */}
+        {/* Rând 2 — CAP | Cur Price | Cur Value */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)',marginBottom:6}}>
           <div>
             <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CAP</div>
             <div style={{fontSize:11,color:CAP_COLORS_NEW[info.cap]||'var(--text3)',fontWeight:600}}>{info.cap||'—'}</div>
           </div>
-          <div/>
-          <div style={{textAlign:'right'}}>
+          <div style={{textAlign:'center'}}>
             <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CUR PRICE</div>
             <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:'var(--text)'}}>{p.curPrice ? fmtC(p.curPrice,p.currency) : '—'}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>VALOARE</div>
+            <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'var(--text)'}}>{p.curValue ? fmtC(p.curValue,p.currency) : '—'}</div>
           </div>
         </div>
 
@@ -774,3 +774,4 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
+
