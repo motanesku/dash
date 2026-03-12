@@ -14,11 +14,12 @@ const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surfac
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
 function useIsMobile() {
-  const [mobile, setMobile] = useState(window.innerWidth < 1024)
+  const mq = window.matchMedia('(max-width: 768px) or (pointer: coarse) and (max-width: 1024px)')
+  const [mobile, setMobile] = useState(mq.matches)
   useEffect(() => {
-    const fn = () => setMobile(window.innerWidth < 1024)
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
+    const fn = (e) => setMobile(e.matches)
+    mq.addEventListener('change', fn)
+    return () => mq.removeEventListener('change', fn)
   }, [])
   return mobile
 }
