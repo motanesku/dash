@@ -5,6 +5,8 @@ import PriceChart from '../components/PriceChart.jsx'
 import CompanyEditModal from '../components/CompanyEditModal.jsx'
 import { CompanyInfoCard, SECTOR_ICONS, CAP_COLORS as CAP_COLORS_NEW, CAPS, SECTORS } from '../components/CompanyInfoSection.jsx'
 import Sparkline from '../components/Sparkline.jsx'
+import AlertModal from '../components/AlertModal.jsx'
+import { loadAlerts } from '../lib/alerts.js'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
 const CAP_COLORS    = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
@@ -248,6 +250,10 @@ export default function Positions({ onEditTx }) {
 
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const [selectedPos, setSelectedPos] = useState(null)
+  const [alertSym, setAlertSym] = useState(null)
+  const alerts = loadAlerts()
+  const [alertSym, setAlertSym] = useState(null)
+  const alerts = loadAlerts()
   const [editInfoSym, setEditInfoSym]   = useState(null)
   const [sortBy, setSortBy]           = useState('value')
   const [view, setView]               = useState('open')
@@ -549,7 +555,19 @@ export default function Positions({ onEditTx }) {
                         <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10,marginTop:2}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
                       </td>
                       <td style={{textAlign:'center',padding:'4px 6px'}}>
-                        <Sparkline symbol={p.symbol} width={72} height={28} days={30} />
+                        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
+                          <Sparkline symbol={p.symbol} width={72} height={28} days={30} />
+                          <button
+                            onClick={e=>{e.stopPropagation();setAlertSym(p.symbol)}}
+                            style={{
+                              background:'none',border:'none',cursor:'pointer',
+                              fontSize:12,padding:'1px 4px',borderRadius:4,
+                              color: alerts[p.symbol]?.targetPrice||alerts[p.symbol]?.stopLoss||alerts[p.symbol]?.dayChangePct||alerts[p.symbol]?.vixPrag ? '#f0b429' : 'var(--text3)',
+                              opacity:0.8,
+                            }}
+                            title="Configurează alerte"
+                          >🔔</button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -730,5 +748,13 @@ export default function Positions({ onEditTx }) {
       )}
       {editInfoSym && <CompanyEditModal symbol={editInfoSym} onClose={()=>setEditInfoSym(null)}/>}
     </div>
+  {alertSym && (
+    <AlertModal
+      sym={alertSym}
+      currentPrice={prices[alertSym]?.price ?? null}
+      onClose={() => setAlertSym(null)}
+    />
+  )}
   )
 }
+
