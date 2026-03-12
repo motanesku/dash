@@ -252,8 +252,6 @@ export default function Positions({ onEditTx }) {
   const [selectedPos, setSelectedPos] = useState(null)
   const [alertSym, setAlertSym] = useState(null)
   const alerts = loadAlerts()
-  const [alertSym, setAlertSym] = useState(null)
-  const alerts = loadAlerts()
   const [editInfoSym, setEditInfoSym]   = useState(null)
   const [sortBy, setSortBy]           = useState('value')
   const [view, setView]               = useState('open')
@@ -748,12 +746,5 @@ export default function Positions({ onEditTx }) {
       )}
       {editInfoSym && <CompanyEditModal symbol={editInfoSym} onClose={()=>setEditInfoSym(null)}/>}
     </div>
-  {alertSym && (
-    <AlertModal
-      sym={alertSym}
-      currentPrice={prices[alertSym]?.price ?? null}
-      onClose={() => setAlertSym(null)}
-    />
-  )}
   )
 }
