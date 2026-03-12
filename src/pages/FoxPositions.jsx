@@ -26,7 +26,7 @@ function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
   const profitColor = (f.profit||0) >= 0 ? 'var(--green)' : 'var(--red)'
   return (
     <div style={{
-      background:'var(--surface)', border:'1px solid var(--border)',
+      border:'1px solid var(--border)',
       borderRadius:12, padding:'14px 16px', marginBottom:10,
       borderLeft:`3px solid ${profitColor}`,
       background: f.inBuyZone ? 'rgba(0,212,170,0.04)' : f.inSellZone ? 'rgba(240,180,41,0.04)' : 'var(--surface)',
