@@ -4,233 +4,93 @@ import { requestNotificationPermission } from '../lib/notifications.js'
 import { loadAlerts, checkAndNotify } from '../lib/alerts.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
-import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
-import { MARKET_SYMBOLS, fetchHistory, fetchHistoryMulti } from '../lib/prices.js'
 import MarketStatus from '../components/MarketStatus.jsx'
+import PerformanceChart from '../components/PerformanceChart.jsx'
+import SectorPieChart from '../components/SectorPieChart.jsx'
+import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 
 const COLORS = ['#58a6ff','#00d4aa','#a78bfa','#f0b429','#ff5572','#34d399','#fb923c','#60a5fa']
 
-// ── Sparkline SVG ────────────────────────────────────────────
 function Sparkline({ values, color, width=60, height=28 }) {
-  if(!values||values.length<2) return <div style={{width,height}}/>
-  const min=Math.min(...values), max=Math.max(...values)
-  const range=max-min||1
-  const pts=values.map((v,i)=>{
-    const x=i/(values.length-1)*width
-    const y=height-(v-min)/range*height
-    return`${x.toFixed(1)},${y.toFixed(1)}`
+  if (!values || values.length < 2) return <div style={{ width, height }} />
+  const min = Math.min(...values), max = Math.max(...values)
+  const range = max - min || 1
+  const pts = values.map((v, i) => {
+    const x = i / (values.length - 1) * width
+    const y = height - (v - min) / range * height
+    return `${x.toFixed(1)},${y.toFixed(1)}`
   }).join(' ')
-  return(
-    <svg width={width} height={height} style={{overflow:'visible'}}>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round"/>
-      <circle cx={values.length-1>0?(values.length-1)/(values.length-1)*width:0} cy={height-(values[values.length-1]-min)/range*height} r={2} fill={color}/>
+  return (
+    <svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={(values.length-1)/(values.length-1)*width} cy={height-(values[values.length-1]-min)/range*height} r={2} fill={color} />
     </svg>
   )
 }
 
-// ── Market Card with sparkline ────────────────────────────────
 function MarketCard({ sym, label, d, history }) {
-  const chg = d?.prev ? ((d.price-d.prev)/d.prev)*100 : null
-  const isPos = chg==null||chg>=0
-  const color = isPos?'var(--green)':'var(--red)'
-  // Use history closes for sparkline, or fallback prev+price
-  const sparkVals = history?.length>1 ? history.map(p=>p.close) : (d&&d.prev?[d.prev,d.price]:null)
-
-  return(
-    <div className="card" style={{
-      padding:'10px 14px',minWidth:110,flexShrink:0,
-      transition:'transform .15s, box-shadow .15s',
-      borderLeft:`2px solid ${color}`,
-    }}
+  const chg = d?.prev ? ((d.price - d.prev) / d.prev) * 100 : null
+  const isPos = chg == null || chg >= 0
+  const color = isPos ? 'var(--green)' : 'var(--red)'
+  const sparkVals = history?.length > 1 ? history.map(p => p.close) : (d && d.prev ? [d.prev, d.price] : null)
+  return (
+    <div className="card" style={{ padding:'10px 14px',minWidth:110,flexShrink:0,transition:'transform .15s, box-shadow .15s',borderLeft:`2px solid ${color}` }}
       onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.boxShadow='var(--shadow)'}}
       onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow=''}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4 }}>
         <div className="label">{label}</div>
-        {sparkVals&&<Sparkline values={sparkVals} color={color}/>}
+        {sparkVals && <Sparkline values={sparkVals} color={color} />}
       </div>
-      <div className="mono" style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>
+      <div className="mono" style={{ fontSize:13,fontWeight:700,color:'var(--text)' }}>
         {d?(()=>{try{const dg=(sym==='^VIX'||sym==='EURUSD=X'||sym==='RON=X')?4:2;return new Intl.NumberFormat('ro-RO',{minimumFractionDigits:dg,maximumFractionDigits:dg}).format(d.price)}catch{return d.price?.toFixed(2)??'—'}})():'—'}
       </div>
-      {chg!=null&&<div className="mono" style={{fontSize:10,color,marginTop:2,fontWeight:600}}>
-        {chg>=0?'+':''}{chg.toFixed(2)}%
-      </div>}
+      {chg!=null&&<div className="mono" style={{fontSize:10,color,marginTop:2,fontWeight:600}}>{chg>=0?'+':''}{chg.toFixed(2)}%</div>}
     </div>
   )
 }
 
-// ── Market Ticker ─────────────────────────────────────────────
 function MarketTicker() {
-  const marketData = useStore(s=>s.marketData)
+  const marketData = useStore(s => s.marketData)
   const [histories, setHistories] = useState({})
-
-  useEffect(()=>{
-    // Fetch 5d history for sparklines for key indices
-    const key = ['^GSPC','^IXIC','^DJI']
-    key.forEach(sym=>{
-      fetchHistory(sym,'5d').then(pts=>{
-        if(pts?.length) setHistories(h=>({...h,[sym]:pts}))
-      }).catch(()=>{})
+  useEffect(() => {
+    ['^GSPC','^IXIC','^DJI'].forEach(sym => {
+      fetchHistory(sym, '5d').then(pts => { if (pts?.length) setHistories(h => ({...h,[sym]:pts})) }).catch(()=>{})
     })
-  },[])
-
-  return(
-    <div style={{display:'flex',gap:8,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,marginBottom:16}}>
-      {MARKET_SYMBOLS.map(({sym,label})=>(
-        <MarketCard key={sym} sym={sym} label={label} d={marketData[sym]} history={histories[sym]}/>
-      ))}
-
-    </div>
-  )
-}
-
-// ── StatCard ──────────────────────────────────────────────────
-function StatCard({label,value,sub,subClass,accent,delay=0}) {
-  return(
-    <div className={`card fade-up delay-${delay}`} style={{padding:'18px 20px',borderLeft:`3px solid ${accent||'var(--border)'}`,position:'relative',overflow:'hidden'}}>
-      <div style={{position:'absolute',top:0,right:0,width:60,height:60,borderRadius:'50%',background:`${accent||'transparent'}18`,transform:'translate(20px,-20px)'}}/>
-      <div className="label" style={{marginBottom:8}}>{label}</div>
-      <div className="mono" style={{fontSize:18,fontWeight:700,color:'var(--text)',marginBottom:4}}>{value}</div>
-      {sub&&<div className={`mono ${subClass||''}`} style={{fontSize:12}}>{sub}</div>}
-    </div>
-  )
-}
-
-// ── Sector Pie Chart ──────────────────────────────────────────
-const SECTOR_COLORS = {
-  // GICS standard
-  'Technology':'#58a6ff','Healthcare':'#a78bfa','Financials':'#f70c0c',
-  'Energy':'#f0b429','Consumer Discretionary':'#ff5572','Consumer Staples':'#fb7185',
-  'Industrials':'#34d399','Materials':'#fb923c','Utilities':'#fff958',
-  'Real Estate':'#f472b6','Communication Services':'#a3e635',
-  // legacy
-  'Tech':'#58a6ff','Finance':'#00d4aa','Health':'#a78bfa',
-  'Consumer':'#ff5572','Industrial':'#34d399','Telecom':'#a3e635',
-  'Other':'#6b7280','—':'#374151',
-}
-const S_ICON = {
-  'Technology':'💻','Healthcare':'🏥','Financials':'🏦','Energy':'⚡',
-  'Consumer Discretionary':'🛍','Consumer Staples':'🛒','Industrials':'🏭',
-  'Materials':'⛏','Utilities':'💡','Real Estate':'🏢','Communication Services':'📡',
-  // legacy
-  'Tech':'💻','Finance':'🏦','Health':'🏥','Consumer':'🛍',
-  'Industrial':'🏭','Telecom':'📡','Other':'·','—':'·',
-}
-
-function SectorPieChart({ positions, companyInfo }) {
-  const [hovered, setHovered] = useState(null)
-
-  const sectorData = useMemo(() => {
-    const map = {}
-    positions.forEach(p => {
-      const info   = companyInfo[p.symbol] || {}
-      const sector = info.sector || p.sector || '—'
-      const val    = p.curValue || 0
-      if (!map[sector]) map[sector] = { sector, value: 0, symbols: [] }
-      map[sector].value    += val
-      map[sector].symbols.push(p.symbol)
-    })
-    const total = Object.values(map).reduce((s, v) => s + v.value, 0)
-    return Object.values(map)
-      .filter(d => d.value > 0)
-      .map(d => ({ ...d, pct: total > 0 ? (d.value / total) * 100 : 0 }))
-      .sort((a, b) => b.value - a.value)
-  }, [positions, companyInfo])
-
-  if (!sectorData.length) return (
-    <div style={{padding:'30px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
-      Informații sector nu sunt disponibile încă. Adaugă tranzacții și așteaptă încărcarea datelor.
-    </div>
-  )
-
-  const total = sectorData.reduce((s, d) => s + d.value, 0)
-  const size = 180, cx = size/2, cy = size/2, r = 72, innerR = 38
-  let angle = -Math.PI / 2
-
-  const slices = sectorData.map(d => {
-    const pct  = d.value / total
-    const a    = pct * 2 * Math.PI
-    const x1   = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle)
-    const x2   = cx + r * Math.cos(angle + a), y2 = cy + r * Math.sin(angle + a)
-    const xi1  = cx + innerR * Math.cos(angle), yi1 = cy + innerR * Math.sin(angle)
-    const xi2  = cx + innerR * Math.cos(angle + a), yi2 = cy + innerR * Math.sin(angle + a)
-    const large = a > Math.PI ? 1 : 0
-    const path  = `M${xi1},${yi1} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${xi2},${yi2} A${innerR},${innerR},0,${large},0,${xi1},${yi1} Z`
-    const midAngle = angle + a / 2
-    const lx = cx + (r + 10) * Math.cos(midAngle)
-    const ly = cy + (r + 10) * Math.sin(midAngle)
-    angle += a
-    return { ...d, path, color: SECTOR_COLORS[d.sector] || '#6b7280', lx, ly, pct: pct * 100 }
-  })
-
-  const hov = hovered ? slices.find(s => s.sector === hovered) : null
-
+  }, [])
   return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:20}}>
-      <div style={{display:'flex',flexWrap:'wrap',gap:24,alignItems:'center',justifyContent:'center',width:'100%'}}>
-      <div style={{position:'relative',flexShrink:0}}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          {slices.map((s, i) => (
-            <path key={i} d={s.path}
-              fill={s.color}
-              opacity={hovered && hovered !== s.sector ? 0.4 : 0.92}
-              style={{cursor:'pointer',transition:'opacity .2s'}}
-              onMouseEnter={() => setHovered(s.sector)}
-              onMouseLeave={() => setHovered(null)}
-            />
-          ))}
-          {/* Center label */}
-          <text x={cx} y={cy - 8} textAnchor="middle" fill="var(--text)" fontSize="13" fontWeight="700" fontFamily="var(--mono)">
-            {hov ? `${hov.pct.toFixed(1)}%` : `${sectorData.length}`}
-          </text>
-          <text x={cx} y={cy + 10} textAnchor="middle" fill="var(--text3)" fontSize="10" fontFamily="var(--mono)">
-            {hov ? hov.sector : 'sectoare'}
-          </text>
-          <text x={cx} y={cy + 24} textAnchor="middle" fill="var(--text3)" fontSize="10" fontFamily="var(--mono)">
-            {hov ? fmtC(hov.value) : ''}
-          </text>
-        </svg>
-      </div>
-      </div>
-      {/* Legend */}
-      <div style={{display:'flex',flexDirection:'column',gap:6,width:'100%',maxWidth:320}}>
-        {slices.map((s, i) => (
-          <div key={i} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',
-            opacity: hovered && hovered !== s.sector ? 0.4 : 1, transition:'opacity .2s'}}
-            onMouseEnter={() => setHovered(s.sector)}
-            onMouseLeave={() => setHovered(null)}>
-            <span style={{width:10,height:10,borderRadius:3,background:s.color,flexShrink:0}}/>
-            <span style={{fontSize:11,color:'var(--text2)',flex:1,fontWeight:500}}>
-              {S_ICON[s.sector]||''} {s.sector}
-            </span>
-            <span className="mono" style={{fontSize:10,color:'var(--text3)',minWidth:36,textAlign:'right'}}>
-              {s.pct.toFixed(1)}%
-            </span>
-            <span className="mono" style={{fontSize:10,color:'var(--text3)',minWidth:70,textAlign:'right'}}>
-              {fmtC(s.value)}
-            </span>
-          </div>
-        ))}
-      </div>
+    <div style={{ display:'flex',gap:8,overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:4,marginBottom:16 }}>
+      {MARKET_SYMBOLS.map(({sym,label}) => <MarketCard key={sym} sym={sym} label={label} d={marketData[sym]} history={histories[sym]} />)}
     </div>
   )
 }
 
-// ── Alloc Chart ───────────────────────────────────────────────
-function AllocChart({positions}) {
-  const total=positions.reduce((s,p)=>s+(p.curValue||0),0)
-  const max=positions[0]?.curValue||1
-  return(
-    <div style={{display:'flex',flexDirection:'column',gap:8}}>
-      {positions.map((p,i)=>{
-        const pct=total>0&&p.curValue?(p.curValue/total)*100:0
-        const barW=max>0?(p.curValue||0)/max*100:0
-        return(
-          <div key={p.broker+p.symbol} style={{display:'grid',gridTemplateColumns:'64px 1fr 44px',alignItems:'center',gap:10}}>
-            <span className="mono" style={{fontSize:11,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.symbol}</span>
-            <div style={{height:6,background:'var(--surface2)',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${barW}%`,background:COLORS[i%COLORS.length],borderRadius:3,transition:'width 1.2s cubic-bezier(.4,0,.2,1)'}}/>
+function StatCard({ label, value, sub, subClass, accent, delay=0 }) {
+  return (
+    <div className={`card fade-up delay-${delay}`} style={{ padding:'18px 20px',borderLeft:`3px solid ${accent||'var(--border)'}`,position:'relative',overflow:'hidden' }}>
+      <div style={{ position:'absolute',top:0,right:0,width:60,height:60,borderRadius:'50%',background:`${accent||'transparent'}18`,transform:'translate(20px,-20px)' }}/>
+      <div className="label" style={{ marginBottom:8 }}>{label}</div>
+      <div className="mono" style={{ fontSize:18,fontWeight:700,color:'var(--text)',marginBottom:4 }}>{value}</div>
+      {sub && <div className={`mono ${subClass||''}`} style={{ fontSize:12 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function AllocChart({ positions }) {
+  const total = positions.reduce((s,p) => s+(p.curValue||0), 0)
+  const max = positions[0]?.curValue || 1
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+      {positions.map((p,i) => {
+        const pct = total>0&&p.curValue ? (p.curValue/total)*100 : 0
+        const barW = max>0 ? (p.curValue||0)/max*100 : 0
+        return (
+          <div key={p.broker+p.symbol} style={{ display:'grid',gridTemplateColumns:'64px 1fr 44px',alignItems:'center',gap:10 }}>
+            <span className="mono" style={{ fontSize:11,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{p.symbol}</span>
+            <div style={{ height:6,background:'var(--surface2)',borderRadius:3,overflow:'hidden' }}>
+              <div style={{ height:'100%',width:`${barW}%`,background:COLORS[i%COLORS.length],borderRadius:3,transition:'width 1.2s cubic-bezier(.4,0,.2,1)' }}/>
             </div>
-            <span className="mono" style={{fontSize:10,color:'var(--text3)',textAlign:'right'}}>{pct.toFixed(1)}%</span>
+            <span className="mono" style={{ fontSize:10,color:'var(--text3)',textAlign:'right' }}>{pct.toFixed(1)}%</span>
           </div>
         )
       })}
@@ -238,40 +98,39 @@ function AllocChart({positions}) {
   )
 }
 
-// ── Monthly Chart ─────────────────────────────────────────────
-function MonthlyChart({txs,prices}) {
-  const data=useMemo(()=>{
-    if(!txs.length) return []
-    const first=new Date(txs.map(t=>t.date).sort()[0])
-    const now=new Date()
-    const months=[]
-    let cur=new Date(first.getFullYear(),first.getMonth(),1)
-    while(cur<=now){months.push(new Date(cur));cur=new Date(cur.getFullYear(),cur.getMonth()+1,1)}
-    return months.map(month=>{
-      const end=new Date(month.getFullYear(),month.getMonth()+1,0)
-      const snap=txs.filter(t=>new Date(t.date)<=end&&t.type!=='DEPOSIT')
-      const pos={}
-      snap.forEach(t=>{
-        if(!pos[t.symbol])pos[t.symbol]={shares:0,cost:0}
-        if(t.type==='BUY'){pos[t.symbol].shares+=t.shares;pos[t.symbol].cost+=t.shares*t.price}
-        else if(t.type==='SELL'){const a=pos[t.symbol].shares>0?pos[t.symbol].cost/pos[t.symbol].shares:t.price;pos[t.symbol].shares-=t.shares;pos[t.symbol].cost-=a*t.shares}
+function MonthlyChart({ txs, prices }) {
+  const data = useMemo(() => {
+    if (!txs.length) return []
+    const first = new Date(txs.map(t=>t.date).sort()[0])
+    const now = new Date()
+    const months = []
+    let cur = new Date(first.getFullYear(), first.getMonth(), 1)
+    while (cur<=now) { months.push(new Date(cur)); cur=new Date(cur.getFullYear(),cur.getMonth()+1,1) }
+    return months.map(month => {
+      const end = new Date(month.getFullYear(), month.getMonth()+1, 0)
+      const snap = txs.filter(t => new Date(t.date)<=end && t.type!=='DEPOSIT')
+      const pos = {}
+      snap.forEach(t => {
+        if (!pos[t.symbol]) pos[t.symbol]={shares:0,cost:0}
+        if (t.type==='BUY') { pos[t.symbol].shares+=t.shares; pos[t.symbol].cost+=t.shares*t.price }
+        else if (t.type==='SELL') { const a=pos[t.symbol].shares>0?pos[t.symbol].cost/pos[t.symbol].shares:t.price; pos[t.symbol].shares-=t.shares; pos[t.symbol].cost-=a*t.shares }
       })
-      const val=Object.entries(pos).reduce((s,[sym,p])=>s+p.shares*(prices[sym]?.price||0),0)
-      const cost=Object.values(pos).reduce((s,p)=>s+p.cost,0)
-      return{label:`${month.toLocaleString('ro-RO',{month:'short'})} ${month.getFullYear().toString().slice(2)}`,val,cost}
+      const val = Object.entries(pos).reduce((s,[sym,p])=>s+p.shares*(prices[sym]?.price||0),0)
+      const cost = Object.values(pos).reduce((s,p)=>s+p.cost,0)
+      return { label:`${month.toLocaleString('ro-RO',{month:'short'})} ${month.getFullYear().toString().slice(2)}`, val, cost }
     })
-  },[txs,prices])
-  if(!data.length) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40}}>Date insuficiente</div>
+  }, [txs, prices])
+  if (!data.length) return <div style={{ color:'var(--text3)',fontSize:12,textAlign:'center',padding:40 }}>Date insuficiente</div>
   const W=500,H=160,PL=8,PR=8,PT=10,PB=24,cW=W-PL-PR,cH=H-PT-PB
   const maxVal=Math.max(...data.map(d=>d.val),1)
   const barW=Math.min(cW/data.length-3,28)
-  return(
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
-      {data.map((d,i)=>{
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow:'visible' }}>
+      {data.map((d,i) => {
         const x=PL+i*(cW/data.length)+(cW/data.length-barW)/2
         const bH=Math.max(d.val/maxVal*cH,2)
         const y=PT+cH-bH
-        return(
+        return (
           <g key={i}>
             <rect x={x} y={y} width={barW} height={bH} fill={d.val>=d.cost?'var(--green)':'var(--red)'} rx={3} opacity={.85}/>
             {i%Math.ceil(data.length/6)===0&&<text x={x+barW/2} y={H-4} textAnchor="middle" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{d.label}</text>}
@@ -282,190 +141,93 @@ function MonthlyChart({txs,prices}) {
   )
 }
 
-// ── Performance Chart — date istorice REALE ───────────────────
-function PerformanceChart({txs,prices}) {
-  const [spPoints,setSpPoints]=useState([])
-  const [symHistories,setSymHistories]=useState({})
-  const [loading,setLoading]=useState(false)
-  const [range,setRange]=useState('6mo')
-
-  const pfSymbols=useMemo(()=>[...new Set(txs.filter(t=>t.type!=='DEPOSIT').map(t=>t.symbol).filter(Boolean))],[txs])
-
-  useEffect(()=>{
-    if(!txs.length) return
-    setLoading(true)
-    setSpPoints([])
-    setSymHistories({})
-    Promise.all([
-      fetchHistory('^GSPC',range),
-      fetchHistoryMulti(pfSymbols,range),
-    ]).then(([sp,histories])=>{
-      setSpPoints(sp||[])
-      setSymHistories(histories||{})
-      setLoading(false)
-    }).catch(()=>setLoading(false))
-  },[pfSymbols.join(','),range])
-
-  const pfPoints=useMemo(()=>{
-    if(!txs.length||!spPoints.length) return []
-    return spPoints.map(sp=>{
-      const date=new Date(sp.date)
-      const snap=txs.filter(t=>new Date(t.date)<=date&&t.type!=='DEPOSIT')
-      const pos={}
-      snap.forEach(t=>{
-        if(!pos[t.symbol])pos[t.symbol]={shares:0,cost:0}
-        if(t.type==='BUY'){pos[t.symbol].shares+=t.shares;pos[t.symbol].cost+=t.shares*t.price}
-        else if(t.type==='SELL'){
-          const avg=pos[t.symbol].shares>0?pos[t.symbol].cost/pos[t.symbol].shares:t.price
-          pos[t.symbol].shares=Math.max(0,pos[t.symbol].shares-t.shares)
-          pos[t.symbol].cost=pos[t.symbol].shares*avg
-        }
-      })
-      // Preț ISTORIC al zilei respective per simbol
-      const val=Object.entries(pos).reduce((s,[sym,p])=>{
-        if(p.shares<=0) return s
-        const hist=symHistories[sym]||[]
-        const pt=hist.find(h=>h.date===sp.date)||hist.filter(h=>h.date<=sp.date).slice(-1)[0]
-        const px=pt?.close??prices[sym]?.price??0
-        return s+p.shares*px
-      },0)
-      const cost=Object.values(pos).reduce((s,p)=>s+p.cost,0)
-      return{date:sp.date,val,cost,pct:cost>0?((val-cost)/cost)*100:0}
-    })
-  },[txs,spPoints,symHistories,prices])
-
-  const RANGES=[{id:'1mo',label:'1L'},{id:'3mo',label:'3L'},{id:'6mo',label:'6L'},{id:'1y',label:'1A'},{id:'2y',label:'2A'}]
-
-  if(loading) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40,fontFamily:'var(--mono)'}}>⟳ se încarcă date istorice...</div>
-  if(!spPoints.length) return <div style={{color:'var(--text3)',fontSize:12,textAlign:'center',padding:40}}>Date indisponibile</div>
-
-  const spFirst=spPoints[0]?.close||1
-  const pfFirst=pfPoints[0]?.pct??0
-  const spNorm=spPoints.map(p=>({y:(p.close-spFirst)/spFirst*100}))
-  const pfNorm=pfPoints.map(p=>({y:p.pct-pfFirst}))
-  const allY=[...spNorm.map(p=>p.y),...pfNorm.map(p=>p.y)]
-  const minY=Math.min(...allY,-2),maxY=Math.max(...allY,2),rangeY=maxY-minY||1
-  const n=spNorm.length
-  const W=500,H=160,PL=38,PR=8,PT=10,PB=24,cW=W-PL-PR,cH=H-PT-PB
-  const toPath=pts=>pts.map((p,i)=>{const x=PL+i/Math.max(n-1,1)*cW;const y=PT+cH-(p.y-minY)/rangeY*cH;return`${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`}).join(' ')
-  const gridVals=[...new Set([Math.round(minY/5)*5,0,Math.round(maxY/5)*5])].sort((a,b)=>a-b)
-  const labelIdxs=[0,Math.floor(n/3),Math.floor(2*n/3),n-1].filter(i=>i<n)
-  const fmtD=d=>new Date(d).toLocaleDateString('ro-RO',{day:'numeric',month:'short'})
-  const spLast=spNorm[spNorm.length-1]?.y||0
-  const pfLast=pfNorm[pfNorm.length-1]?.y||0
-
-  return(
-    <div>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
-        <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
-          <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
-            <span style={{width:18,height:2,background:'#00d4aa',display:'inline-block',borderRadius:1}}/>
-            <span style={{color:'var(--text3)'}}>S&P 500</span>
-            <span className="mono" style={{fontWeight:700,color:spLast>=0?'var(--green)':'var(--red)'}}>{spLast>=0?'+':''}{spLast.toFixed(2)}%</span>
-          </span>
-          <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11}}>
-            <span style={{width:18,height:0,borderTop:'2px dashed #58a6ff',display:'inline-block'}}/>
-            <span style={{color:'var(--text3)'}}>Portofoliu</span>
-            <span className="mono" style={{fontWeight:700,color:pfLast>=0?'var(--green)':'var(--red)'}}>{pfLast>=0?'+':''}{pfLast.toFixed(2)}%</span>
-          </span>
-        </div>
-        <div style={{display:'flex',gap:4}}>
-          {RANGES.map(r=>(
-            <button key={r.id} onClick={()=>setRange(r.id)} style={{
-              padding:'2px 8px',borderRadius:4,border:'1px solid var(--border)',cursor:'pointer',
-              fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
-              background:range===r.id?'var(--blue)':'transparent',
-              color:range===r.id?'#fff':'var(--text3)',transition:'all .15s',
-            }}>{r.label}</button>
-          ))}
-        </div>
-      </div>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
-        {gridVals.map(v=>{const y=PT+cH-(v-minY)/rangeY*cH;return<g key={v}><line x1={PL} y1={y} x2={W-PR} y2={y} stroke="var(--border)" strokeWidth={v===0?1.5:.5} strokeDasharray={v===0?'none':'3 3'}/><text x={PL-4} y={y+3} textAnchor="end" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{v>0?'+':''}{v}%</text></g>})}
-        <path d={toPath(spNorm)} fill="none" stroke="#00d4aa" strokeWidth={1.5} strokeLinejoin="round"/>
-        <path d={toPath(pfNorm)} fill="none" stroke="#58a6ff" strokeWidth={2} strokeLinejoin="round" strokeDasharray="5 3"/>
-        {labelIdxs.map(i=>{const x=PL+i/Math.max(n-1,1)*cW;return<text key={i} x={x} y={H-4} textAnchor="middle" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{fmtD(spPoints[i]?.date)}</text>})}
-      </svg>
-      <div style={{fontSize:9,color:'var(--text3)',textAlign:'right',marginTop:4,fontFamily:'var(--mono)'}}>
-        📊 prețuri istorice reale · {pfSymbols.length} simboluri
-      </div>
+function SkeletonCard() {
+  return (
+    <div className="card" style={{ padding:'18px 20px' }}>
+      <div className="skeleton" style={{ height:10,width:80,marginBottom:12 }}/>
+      <div className="skeleton" style={{ height:22,width:120,marginBottom:8 }}/>
+      <div className="skeleton" style={{ height:12,width:60 }}/>
     </div>
   )
 }
 
-// ── Skeleton ──────────────────────────────────────────────────
-function SkeletonCard() {
-  return(<div className="card" style={{padding:'18px 20px'}}><div className="skeleton" style={{height:10,width:80,marginBottom:12}}/><div className="skeleton" style={{height:22,width:120,marginBottom:8}}/><div className="skeleton" style={{height:12,width:60}}/></div>)
-}
-
-// ── Dashboard ─────────────────────────────────────────────────
 export default function Dashboard() {
-  const txs=useStore(s=>s.txs)
-  const prices=useStore(s=>s.prices)
-  const fearGreed=useStore(s=>s.fearGreed)
-  const marketData=useStore(s=>s.marketData)
+  const txs = useStore(s => s.txs)
+  const prices = useStore(s => s.prices)
+  const fearGreed = useStore(s => s.fearGreed)
+  const marketData = useStore(s => s.marketData)
   const vix = marketData?.['^VIX']?.price ?? null
-  const companyInfo=useStore(s=>s.companyInfo)
-  const cloudLoading=useStore(s=>s.cloudLoading)
-  const pricesLoading=useStore(s=>s.pricesLoading)
-  const hasCachedData=Object.keys(prices).length>0||txs.length>0
-  const isFirstLoad=cloudLoading&&!hasCachedData
-  const [chartTab,setChartTab]=useState('perf')
-  const [notifPerm, setNotifPerm] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+  const companyInfo = useStore(s => s.companyInfo)
+  const cloudLoading = useStore(s => s.cloudLoading)
+  const pricesLoading = useStore(s => s.pricesLoading)
+  const hasCachedData = Object.keys(prices).length>0 || txs.length>0
+  const isFirstLoad = cloudLoading && !hasCachedData
+  const [chartTab, setChartTab] = useState('perf')
+  const [notifPerm, setNotifPerm] = useState(typeof Notification!=='undefined' ? Notification.permission : 'unsupported')
 
-  // Verifică alerte de preț la fiecare update de prețuri
   useEffect(() => {
-    if (notifPerm !== 'granted') return;
-    const alerts = loadAlerts();
-    if (!Object.keys(alerts).length) return;
-    checkAndNotify(prices, marketData, alerts);
-  }, [prices]);
+    if (notifPerm !== 'granted') return
+    const alerts = loadAlerts()
+    if (!Object.keys(alerts).length) return
+    checkAndNotify(prices, marketData, alerts)
+  }, [prices])
 
   async function handleEnableNotif() {
-    const perm = await requestNotificationPermission();
-    setNotifPerm(perm);
+    const perm = await requestNotificationPermission()
+    setNotifPerm(perm)
   }
 
-  const {positions,closedPositions,cashByBroker}=useMemo(()=>calcPortfolio(txs,prices),[txs,prices])
-  const agg=useMemo(()=>aggregatePositions(positions,closedPositions),[positions,closedPositions])
-  const cashTotal=Object.values(cashByBroker).reduce((s,v)=>s+v,0)
-  const totalWithCash=agg.totalCurValue+cashTotal
-  const cashPct=totalWithCash>0?(cashTotal/totalWithCash)*100:0
+  const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
+  const agg = useMemo(() => aggregatePositions(positions, closedPositions), [positions, closedPositions])
+  const cashTotal = Object.values(cashByBroker).reduce((s,v) => s+v, 0)
+  const totalWithCash = agg.totalCurValue + cashTotal
+  const cashPct = totalWithCash>0 ? (cashTotal/totalWithCash)*100 : 0
 
-  const CHART_TABS=[
+  const CHART_TABS = [
     {id:'perf',label:'📈 Performanță'},
     {id:'alloc',label:'▦ Alocare'},
     {id:'monthly',label:'📊 Lunar'},
     {id:'sectors',label:'🥧 Sectoare'},
   ]
 
-  return(
+  return (
     <div className="fade-up">
-      {/* Buton activare notificări */}
-      {notifPerm === 'default' && 'Notification' in window && (
+      {notifPerm==='default' && 'Notification' in window && (
         <div onClick={handleEnableNotif} style={{
-          position:'fixed', bottom:20, left:20, zIndex:99,
-          background:'var(--surface)', border:'1px solid var(--border2)',
-          borderRadius:8, padding:'8px 14px',
-          display:'flex', alignItems:'center', gap:8,
-          fontSize:11, color:'var(--text2)', fontFamily:'var(--mono)',
-          boxShadow:'var(--shadow)', cursor:'pointer',
-        }}>
-          🔔 Activează notificări
-        </div>
+          position:'fixed',bottom:20,left:20,zIndex:99,background:'var(--surface)',border:'1px solid var(--border2)',
+          borderRadius:8,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
+          fontSize:11,color:'var(--text2)',fontFamily:'var(--mono)',boxShadow:'var(--shadow)',cursor:'pointer',
+        }}>🔔 Activează notificări</div>
       )}
 
-      {pricesLoading&&hasCachedData&&(
-        <div style={{position:'fixed',bottom:20,right:20,zIndex:99,background:'var(--surface)',border:'1px solid var(--border2)',borderRadius:8,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)',boxShadow:'var(--shadow)'}}>
+      {pricesLoading && hasCachedData && (
+        <div style={{
+          position:'fixed',bottom:20,right:20,zIndex:99,background:'var(--surface)',border:'1px solid var(--border2)',
+          borderRadius:8,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
+          fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)',boxShadow:'var(--shadow)',
+        }}>
           <span style={{animation:'pulse 1s infinite',display:'inline-block'}}>⟳</span> actualizare...
         </div>
       )}
 
-      <MarketStatus/>
-      <FearGreedBanner fearGreed={fearGreed} vix={vix}/>
-      <MarketCards prices={{...prices,...marketData}}/>
+      <MarketStatus />
+      <FearGreedBanner fearGreed={fearGreed} vix={vix} />
+      <MarketCards prices={{...prices,...marketData}} />
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20}}>
+      {/* ── Titlu Sumar Portofoliu ── */}
+      <div style={{ marginBottom:10, marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
+        <span style={{
+          fontSize:11, fontWeight:700, letterSpacing:'0.08em',
+          textTransform:'uppercase', color:'var(--text3)', fontFamily:'var(--mono)',
+        }}>📋 Sumar Portofoliu</span>
+        {positions.length>0 && (
+          <span style={{ fontSize:10, color:'var(--text3)', fontFamily:'var(--mono)' }}>
+            · {positions.length} poziții deschise
+          </span>
+        )}
+      </div>
+
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20 }}>
         <StatCard delay={1} label="Valoare Totală" value={fmtC(agg.totalCurValue)} sub={`${positions.length} poziții`} accent="var(--blue)"/>
         <StatCard delay={2} label="Cost Investit" value={fmtC(agg.totalCostBasis)} sub={`${txs.filter(t=>t.type!=='DEPOSIT').length} tranzacții`} accent="var(--text3)"/>
         <StatCard delay={3} label="Profit Nerealizat" value={fmtC(agg.totalUnrealized)} sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)} accent={agg.totalUnrealized>=0?'var(--green)':'var(--red)'}/>
@@ -473,10 +235,10 @@ export default function Dashboard() {
         <StatCard delay={5} label="💵 Cash" value={fmtC(cashTotal)} sub={fmtPct(cashPct,false)+' din port.'} accent="var(--gold)"/>
       </div>
 
-      {positions.length>0&&(
-        <div className="card fade-up delay-5" style={{padding:'16px 18px',marginBottom:20}}>
-          <div style={{display:'flex',gap:5,marginBottom:14,borderBottom:'1px solid var(--border)',paddingBottom:12,overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-            {CHART_TABS.map(t=>(
+      {positions.length>0 && (
+        <div className="card fade-up delay-5" style={{ padding:'16px 18px',marginBottom:20 }}>
+          <div style={{ display:'flex',gap:5,marginBottom:14,borderBottom:'1px solid var(--border)',paddingBottom:12,overflowX:'auto',WebkitOverflowScrolling:'touch' }}>
+            {CHART_TABS.map(t => (
               <button key={t.id} onClick={()=>setChartTab(t.id)} style={{
                 padding:'5px 10px',borderRadius:6,border:'none',cursor:'pointer',flexShrink:0,
                 background:chartTab===t.id?'var(--blue)':'var(--surface2)',
@@ -492,15 +254,18 @@ export default function Dashboard() {
         </div>
       )}
 
-      {isFirstLoad&&(<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12}}>{[1,2,3,4,5].map(i=><SkeletonCard key={i}/>)}</div>)}
-      {positions.length===0&&!isFirstLoad&&(
-        <div className="card" style={{padding:'60px 20px',textAlign:'center'}}>
-          <div style={{fontSize:40,marginBottom:12}}>📊</div>
-          <div style={{fontWeight:600,fontSize:16,marginBottom:6}}>Nicio poziție încă</div>
-          <div style={{color:'var(--text3)',fontSize:13}}>Adaugă tranzacții sau importă din Excel.</div>
+      {isFirstLoad && (
+        <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12 }}>
+          {[1,2,3,4,5].map(i => <SkeletonCard key={i}/>)}
+        </div>
+      )}
+      {positions.length===0 && !isFirstLoad && (
+        <div className="card" style={{ padding:'60px 20px',textAlign:'center' }}>
+          <div style={{ fontSize:40,marginBottom:12 }}>📊</div>
+          <div style={{ fontWeight:600,fontSize:16,marginBottom:6 }}>Nicio poziție încă</div>
+          <div style={{ color:'var(--text3)',fontSize:13 }}>Adaugă tranzacții sau importă din Excel.</div>
         </div>
       )}
     </div>
   )
 }
-
