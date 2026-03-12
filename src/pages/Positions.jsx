@@ -317,7 +317,6 @@ export default function Positions({ onEditTx }) {
     fetchBetas(syms).then(b => setBetas(b)).catch(() => {})
   }, [positions.map(p => p.symbol).join(',')])
 
-  const portfolioBeta = useMemo(() => calcPortfolioBeta(filteredOpen, betas), [filteredOpen, betas])
   const [view, setView]               = useState('open')
 
   // Per-broker stats
@@ -356,6 +355,8 @@ export default function Positions({ onEditTx }) {
     const arr = brokerTab ? closedPositions.filter(p => p.broker === brokerTab) : closedPositions
     return [...arr].sort((a,b) => b.totalProfit - a.totalProfit)
   }, [closedPositions, brokerTab])
+
+  const portfolioBeta = useMemo(() => calcPortfolioBeta(filteredOpen, betas), [filteredOpen, betas])
 
   const totalVal        = filteredOpen.reduce((s,p) => s + (p.curValue||0), 0)
   const totalCost       = filteredOpen.reduce((s,p) => s + p.costBasis, 0)
