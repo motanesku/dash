@@ -1,0 +1,156 @@
+import { useMemo, useState, useEffect } from 'react'
+import { fetchHistory, fetchHistoryMulti } from '../lib/prices.js'
+
+export default function PerformanceChart({ txs, prices }) {
+  const [spPoints, setSpPoints] = useState([])
+  const [symHistories, setSymHistories] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [range, setRange] = useState('6mo')
+
+  const pfSymbols = useMemo(
+    () => [...new Set(txs.filter(t => t.type !== 'DEPOSIT').map(t => t.symbol).filter(Boolean))],
+    [txs]
+  )
+
+  useEffect(() => {
+    if (!txs.length) return
+    setLoading(true)
+    setSpPoints([])
+    setSymHistories({})
+    Promise.all([
+      fetchHistory('^GSPC', range),
+      fetchHistoryMulti(pfSymbols, range),
+    ]).then(([sp, histories]) => {
+      setSpPoints(sp || [])
+      setSymHistories(histories || {})
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [pfSymbols.join(','), range])
+
+  // Calculează portofoliu snapshot per zi — memoizat corect pe toate dependențele
+  const pfPoints = useMemo(() => {
+    if (!txs.length || !spPoints.length || !Object.keys(symHistories).length) return []
+
+    // Pre-procesăm tranzacțiile o singură dată, sortate
+    const sortedTxs = [...txs]
+      .filter(t => t.type !== 'DEPOSIT')
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+
+    return spPoints.map(sp => {
+      const date = new Date(sp.date)
+      const pos = {}
+
+      for (const t of sortedTxs) {
+        if (new Date(t.date) > date) break
+        if (!pos[t.symbol]) pos[t.symbol] = { shares: 0, cost: 0 }
+        if (t.type === 'BUY') {
+          pos[t.symbol].shares += t.shares
+          pos[t.symbol].cost += t.shares * t.price
+        } else if (t.type === 'SELL') {
+          const avg = pos[t.symbol].shares > 0 ? pos[t.symbol].cost / pos[t.symbol].shares : t.price
+          pos[t.symbol].shares = Math.max(0, pos[t.symbol].shares - t.shares)
+          pos[t.symbol].cost = pos[t.symbol].shares * avg
+        }
+      }
+
+      const val = Object.entries(pos).reduce((s, [sym, p]) => {
+        if (p.shares <= 0) return s
+        const hist = symHistories[sym] || []
+        const pt = hist.find(h => h.date === sp.date) || hist.filter(h => h.date <= sp.date).slice(-1)[0]
+        const px = pt?.close ?? prices[sym]?.price ?? 0
+        return s + p.shares * px
+      }, 0)
+
+      const cost = Object.values(pos).reduce((s, p) => s + p.cost, 0)
+      return { date: sp.date, val, cost, pct: cost > 0 ? ((val - cost) / cost) * 100 : 0 }
+    })
+  }, [txs, spPoints, symHistories, prices])
+
+  const RANGES = [
+    { id: '1mo', label: '1L' }, { id: '3mo', label: '3L' },
+    { id: '6mo', label: '6L' }, { id: '1y', label: '1A' }, { id: '2y', label: '2A' },
+  ]
+
+  if (loading) return (
+    <div style={{ color: 'var(--text3)', fontSize: 12, textAlign: 'center', padding: 40, fontFamily: 'var(--mono)' }}>
+      ⟳ se încarcă date istorice...
+    </div>
+  )
+  if (!spPoints.length) return (
+    <div style={{ color: 'var(--text3)', fontSize: 12, textAlign: 'center', padding: 40 }}>
+      Date indisponibile
+    </div>
+  )
+
+  const spFirst = spPoints[0]?.close || 1
+  const pfFirst = pfPoints[0]?.pct ?? 0
+  const spNorm = spPoints.map(p => ({ y: (p.close - spFirst) / spFirst * 100 }))
+  const pfNorm = pfPoints.map(p => ({ y: p.pct - pfFirst }))
+  const allY = [...spNorm.map(p => p.y), ...pfNorm.map(p => p.y)]
+  const minY = Math.min(...allY, -2), maxY = Math.max(...allY, 2), rangeY = maxY - minY || 1
+  const n = spNorm.length
+  const W = 500, H = 160, PL = 38, PR = 8, PT = 10, PB = 24, cW = W - PL - PR, cH = H - PT - PB
+  const toPath = pts => pts.map((p, i) => {
+    const x = PL + i / Math.max(n - 1, 1) * cW
+    const y = PT + cH - (p.y - minY) / rangeY * cH
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  const gridVals = [...new Set([Math.round(minY / 5) * 5, 0, Math.round(maxY / 5) * 5])].sort((a, b) => a - b)
+  const labelIdxs = [0, Math.floor(n / 3), Math.floor(2 * n / 3), n - 1].filter(i => i < n)
+  const fmtD = d => new Date(d).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })
+  const spLast = spNorm[spNorm.length - 1]?.y || 0
+  const pfLast = pfNorm[pfNorm.length - 1]?.y || 0
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+            <span style={{ width: 18, height: 2, background: '#00d4aa', display: 'inline-block', borderRadius: 1 }} />
+            <span style={{ color: 'var(--text3)' }}>S&P 500</span>
+            <span className="mono" style={{ fontWeight: 700, color: spLast >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {spLast >= 0 ? '+' : ''}{spLast.toFixed(2)}%
+            </span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}>
+            <span style={{ width: 18, height: 0, borderTop: '2px dashed #58a6ff', display: 'inline-block' }} />
+            <span style={{ color: 'var(--text3)' }}>Portofoliu</span>
+            <span className="mono" style={{ fontWeight: 700, color: pfLast >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {pfLast >= 0 ? '+' : ''}{pfLast.toFixed(2)}%
+            </span>
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {RANGES.map(r => (
+            <button key={r.id} onClick={() => setRange(r.id)} style={{
+              padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', cursor: 'pointer',
+              fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 600,
+              background: range === r.id ? 'var(--blue)' : 'transparent',
+              color: range === r.id ? '#fff' : 'var(--text3)', transition: 'all .15s',
+            }}>{r.label}</button>
+          ))}
+        </div>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: 'visible' }}>
+        {gridVals.map(v => {
+          const y = PT + cH - (v - minY) / rangeY * cH
+          return (
+            <g key={v}>
+              <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="var(--border)" strokeWidth={v === 0 ? 1.5 : .5} strokeDasharray={v === 0 ? 'none' : '3 3'} />
+              <text x={PL - 4} y={y + 3} textAnchor="end" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{v > 0 ? '+' : ''}{v}%</text>
+            </g>
+          )
+        })}
+        <path d={toPath(spNorm)} fill="none" stroke="#00d4aa" strokeWidth={1.5} strokeLinejoin="round" />
+        <path d={toPath(pfNorm)} fill="none" stroke="#58a6ff" strokeWidth={2} strokeLinejoin="round" strokeDasharray="5 3" />
+        {labelIdxs.map(i => {
+          const x = PL + i / Math.max(n - 1, 1) * cW
+          return <text key={i} x={x} y={H - 4} textAnchor="middle" fontSize={8} fill="var(--text3)" fontFamily="var(--mono)">{fmtD(spPoints[i]?.date)}</text>
+        })}
+      </svg>
+      <div style={{ fontSize: 9, color: 'var(--text3)', textAlign: 'right', marginTop: 4, fontFamily: 'var(--mono)' }}>
+        📊 prețuri istorice reale · {pfSymbols.length} simboluri
+      </div>
+    </div>
+  )
+}
