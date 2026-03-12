@@ -8,6 +8,7 @@ import MarketStatus from '../components/MarketStatus.jsx'
 import PerformanceChart from '../components/PerformanceChart.jsx'
 import SectorPieChart from '../components/SectorPieChart.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { fetchBetas, betaLabel, calcPortfolioBeta } from '../lib/beta.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 
 const COLORS = ['#58a6ff','#00d4aa','#a78bfa','#f0b429','#ff5572','#34d399','#fb923c','#60a5fa']
@@ -180,6 +181,13 @@ export default function Dashboard() {
   const { positions, closedPositions, cashByBroker } = useMemo(() => calcPortfolio(txs, prices), [txs, prices])
   const agg = useMemo(() => aggregatePositions(positions, closedPositions), [positions, closedPositions])
   const cashTotal = Object.values(cashByBroker).reduce((s,v) => s+v, 0)
+  const [betas, setBetas] = useState({})
+  useEffect(() => {
+    const syms = [...new Set(positions.map(p => p.symbol))]
+    if (!syms.length) return
+    fetchBetas(syms).then(b => setBetas(b)).catch(() => {})
+  }, [positions.map(p=>p.symbol).join(',')])
+  const portfolioBeta = useMemo(() => calcPortfolioBeta(positions, betas), [positions, betas])
   const totalWithCash = agg.totalCurValue + cashTotal
   const cashPct = totalWithCash>0 ? (cashTotal/totalWithCash)*100 : 0
 
@@ -233,6 +241,10 @@ export default function Dashboard() {
         <StatCard delay={3} label="Profit Nerealizat" value={fmtC(agg.totalUnrealized)} sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)} accent={agg.totalUnrealized>=0?'var(--green)':'var(--red)'}/>
         <StatCard delay={4} label="Profit Realizat" value={fmtC(agg.totalRealized)} sub={fmtPct(agg.rPct)} subClass={pnlClass(agg.totalRealized)} accent="var(--purple)"/>
         <StatCard delay={5} label="💵 Cash" value={fmtC(cashTotal)} sub={fmtPct(cashPct,false)+' din port.'} accent="var(--gold)"/>
+        {portfolioBeta != null && (() => {
+          const lbl = betaLabel(portfolioBeta)
+          return <StatCard delay={6} label="Beta Portofoliu" value={`β ${portfolioBeta.toFixed(2)}`} sub={`${lbl.emoji} ${lbl.text}`} accent={lbl.color}/>
+        })()}
       </div>
 
       {positions.length>0 && (
@@ -269,3 +281,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
