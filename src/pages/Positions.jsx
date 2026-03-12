@@ -757,4 +757,3 @@ export default function Positions({ onEditTx }) {
   )}
   )
 }
-
