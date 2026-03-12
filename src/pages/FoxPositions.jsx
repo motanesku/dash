@@ -6,6 +6,147 @@ import CompanyInfoSection, { SECTOR_ICONS as S_ICON, CAP_COLORS, SECTORS, CAPS }
 const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surface)' }
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
+function useIsMobile() {
+  function check() {
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
+    const isNarrow = window.innerWidth < 1024
+    return isTouch || isNarrow
+  }
+  const [mobile, setMobile] = useState(check)
+  useEffect(() => {
+    const fn = () => setMobile(check())
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+  return mobile
+}
+
+// ── Mobile Card: Poziție Deschisă FOX ────────────────────────
+function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
+  const profitColor = (f.profit||0) >= 0 ? 'var(--green)' : 'var(--red)'
+  return (
+    <div style={{
+      background:'var(--surface)', border:'1px solid var(--border)',
+      borderRadius:12, padding:'14px 16px', marginBottom:10,
+      borderLeft:`3px solid ${profitColor}`,
+      background: f.inBuyZone ? 'rgba(0,212,170,0.04)' : f.inSellZone ? 'rgba(240,180,41,0.04)' : 'var(--surface)',
+    }}>
+      {/* Header */}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+        <div>
+          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>{f.symbol}</div>
+          <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{f.name}</div>
+          <div style={{display:'flex',gap:4,marginTop:4,flexWrap:'wrap'}}>
+            {f.sector&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',color:'var(--blue)',border:'1px solid var(--border)'}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+            {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
+          </div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
+            {f.cur!=null ? fmtC(f.cur) : '—'}
+          </div>
+          {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:11}}>{fmtPct(f.dayChg)}</div>}
+          <div className={`mono ${pnlClass(f.profit)}`} style={{fontSize:12,fontWeight:700,marginTop:2}}>
+            {f.profit!=null?fmtC(f.profit):'—'}
+          </div>
+          <div className={`mono ${pnlClass(f.roi)}`} style={{fontSize:11}}>
+            {f.roi!=null?fmtPct(f.roi):'—'}
+          </div>
+        </div>
+      </div>
+
+      {/* Dețiteri */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)',marginBottom:6}}>
+        <div>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ACȚIUNI</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{f.shares}</div>
+        </div>
+        <div>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ MEDIU</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(f.avgPrice)}</div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PONDERE</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--blue)',fontWeight:600}}>{f.pondere.toFixed(1)}%</div>
+        </div>
+      </div>
+
+      {/* Obiectiv */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)'}}>
+        <div>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>BUY MIN</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--gold)'}}>
+            {f.inBuyZone&&<span style={{marginRight:3}}>🟢</span>}
+            {f.buyMin ? `≤${f.buyMin}` : '—'}
+          </div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SELL</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--purple)'}}>
+            {f.inSellZone&&<span style={{marginRight:3}}>⚡</span>}
+            {f.sellMin&&f.sellMax?`${f.sellMin}–${f.sellMax}`:f.sellMin?`≥${f.sellMin}`:f.sellMax?`≤${f.sellMax}`:'—'}
+          </div>
+        </div>
+      </div>
+
+      {isAdmin&&(
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          <button onClick={()=>onEdit(f)} style={{flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text3)',cursor:'pointer',fontSize:11}}>✏ Editează</button>
+          <button onClick={()=>onDelete(f.id)} style={{padding:'6px 12px',borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-bg)',color:'var(--red)',cursor:'pointer',fontSize:11}}>✕</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Mobile Card: Poziție Închisă FOX ─────────────────────────
+function MobileFoxClosedCard({ f, isAdmin, onEdit, onDelete }) {
+  const profitColor = (f.profit||0) >= 0 ? 'var(--green)' : 'var(--red)'
+  return (
+    <div style={{
+      background:'var(--surface)', border:'1px solid var(--border)',
+      borderRadius:12, padding:'14px 16px', marginBottom:10,
+      borderLeft:`3px solid ${profitColor}`,
+    }}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+        <div>
+          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>{f.symbol}</div>
+          <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>{f.name}</div>
+          {f.sellDate&&<div style={{fontSize:10,color:'var(--text3)',marginTop:2}}>închis {fmtDate(f.sellDate)}</div>}
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div className={`mono ${pnlClass(f.profit)}`} style={{fontSize:16,fontWeight:700}}>{f.profit!=null?fmtC(f.profit):'—'}</div>
+          <div className={`mono ${pnlClass(f.roi)}`} style={{fontSize:12,fontWeight:600}}>{f.roi!=null?fmtPct(f.roi):'—'}</div>
+        </div>
+      </div>
+
+      <div style={{padding:'8px 10px',borderRadius:6,background:'rgba(88,166,255,0.06)',border:'1px solid rgba(88,166,255,0.15)',marginBottom:6}}>
+        <div style={{fontSize:9,color:'var(--blue)',fontWeight:700,marginBottom:6}}>▲ CUMPĂRARE</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+          <div><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ACȚIUNI</div><div style={{fontFamily:'var(--mono)',fontSize:12}}>{f.buyShares||'—'}</div></div>
+          <div><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ</div><div style={{fontFamily:'var(--mono)',fontSize:12}}>{f.buyPrice?fmtC(f.buyPrice):'—'}</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>TOTAL</div><div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{f.buyTotal?fmtC(f.buyTotal):'—'}</div></div>
+        </div>
+      </div>
+
+      <div style={{padding:'8px 10px',borderRadius:6,background:f.profit>=0?'rgba(0,212,170,0.06)':'rgba(255,85,114,0.06)',border:`1px solid ${f.profit>=0?'rgba(0,212,170,0.15)':'rgba(255,85,114,0.15)'}`}}>
+        <div style={{fontSize:9,color:profitColor,fontWeight:700,marginBottom:6}}>▼ VÂNZARE</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+          <div><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ACȚIUNI</div><div style={{fontFamily:'var(--mono)',fontSize:12}}>{f.sellShares||'—'}</div></div>
+          <div><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ</div><div style={{fontFamily:'var(--mono)',fontSize:12,color:profitColor,fontWeight:600}}>{f.sellPrice?fmtC(f.sellPrice):'—'}</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ÎNCASAT</div><div style={{fontFamily:'var(--mono)',fontSize:12,color:profitColor,fontWeight:600}}>{f.sellTotal?fmtC(f.sellTotal):'—'}</div></div>
+        </div>
+      </div>
+
+      {isAdmin&&(
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          <button onClick={()=>onEdit(f)} style={{flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',background:'var(--surface2)',color:'var(--text3)',cursor:'pointer',fontSize:11}}>✏ Editează</button>
+          <button onClick={()=>onDelete(f.id)} style={{padding:'6px 12px',borderRadius:6,border:'1px solid var(--red-b)',background:'var(--red-bg)',color:'var(--red)',cursor:'pointer',fontSize:11}}>✕</button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Modal: Poziție Deschisă ───────────────────────────────
 function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onClose }) {
@@ -37,8 +178,6 @@ function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onC
         <div className="modal-title">{item?'✏ Editează FOX':'🦊 Poziție FOX — Deschisă'}</div>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           <CompanyInfoSection form={form} setForm={setForm} prices={prices} companyInfo={companyInfo} fetchCompanyInfo={fetchCompanyInfo}/>
-
-          {/* Dețiteri */}
           <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
             <div className="label" style={{marginBottom:10,color:'var(--green)'}}>DEȚITERI</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -56,8 +195,6 @@ function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onC
               {profit!=null&&<> · Profit: <span className={pnlClass(profit)} style={{fontWeight:600}}>{fmtC(profit)}</span> · ROI: <span className={pnlClass(roi)} style={{fontWeight:600}}>{fmtPct(roi)}</span></>}
             </div>}
           </div>
-
-          {/* Obiectiv */}
           <div style={{background:'var(--surface2)',borderRadius:8,padding:12}}>
             <div className="label" style={{marginBottom:10,color:'var(--gold)'}}>OBIECTIV</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
@@ -75,7 +212,6 @@ function OpenFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, onC
               </div>
             </div>
           </div>
-
           {err&&<div style={{color:'var(--red)',fontSize:12,padding:'8px 12px',background:'var(--red-bg)',borderRadius:6,border:'1px solid var(--red-b)'}}>{err}</div>}
         </div>
         <div className="modal-footer">
@@ -101,7 +237,6 @@ function ClosedFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, o
     const v = +e.target.value||0
     setForm(f=>{
       const next = {...f,[k]:v}
-      // Auto-calc totals and profit
       const buyTotal  = (k==='buyShares'?v:next.buyShares)  * (k==='buyPrice'?v:next.buyPrice)
       const sellTotal = (k==='sellShares'?v:next.sellShares) * (k==='sellPrice'?v:next.sellPrice)
       const profit    = sellTotal - buyTotal
@@ -125,65 +260,30 @@ function ClosedFoxModal({ item, prices, companyInfo, fetchCompanyInfo, onSave, o
         <div className="modal-title">{item?'✏ Editează FOX Închisă':'✓ Poziție FOX — Închisă'}</div>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           <CompanyInfoSection form={form} setForm={setForm} prices={prices} companyInfo={companyInfo} fetchCompanyInfo={fetchCompanyInfo}/>
-
-          {/* Buy */}
           <div style={{background:'var(--green-bg)',borderRadius:8,padding:12,border:'1px solid var(--green-b)'}}>
             <div className="label" style={{marginBottom:10,color:'var(--green)'}}>▲ CUMPĂRARE</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div>
-                <input className="input mono" type="number" min="0" step="any" value={form.buyShares||''} onChange={setN('buyShares')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Preț Mediu</div>
-                <input className="input mono" type="number" min="0" step="any" value={form.buyPrice||''} onChange={setN('buyPrice')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Data</div>
-                <input className="input" type="date" value={form.buyDate||''} onChange={set('buyDate')}/>
-              </div>
+              <div><div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div><input className="input mono" type="number" min="0" step="any" value={form.buyShares||''} onChange={setN('buyShares')}/></div>
+              <div><div className="label" style={{marginBottom:4}}>Preț Mediu</div><input className="input mono" type="number" min="0" step="any" value={form.buyPrice||''} onChange={setN('buyPrice')}/></div>
+              <div><div className="label" style={{marginBottom:4}}>Data</div><input className="input" type="date" value={form.buyDate||''} onChange={set('buyDate')}/></div>
             </div>
-            {form.buyTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>
-              Total cost: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.buyTotal)}</span>
-            </div>}
+            {form.buyTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>Total cost: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.buyTotal)}</span></div>}
           </div>
-
-          {/* Sell */}
           <div style={{background:'var(--red-bg)',borderRadius:8,padding:12,border:'1px solid var(--red-b)'}}>
             <div className="label" style={{marginBottom:10,color:'var(--red)'}}>▼ VÂNZARE</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div>
-                <input className="input mono" type="number" min="0" step="any" value={form.sellShares||''} onChange={setN('sellShares')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Preț Vânzare</div>
-                <input className="input mono" type="number" min="0" step="any" value={form.sellPrice||''} onChange={setN('sellPrice')}/>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Data</div>
-                <input className="input" type="date" value={form.sellDate||''} onChange={set('sellDate')}/>
-              </div>
+              <div><div className="label" style={{marginBottom:4}}>Nr. Acțiuni</div><input className="input mono" type="number" min="0" step="any" value={form.sellShares||''} onChange={setN('sellShares')}/></div>
+              <div><div className="label" style={{marginBottom:4}}>Preț Vânzare</div><input className="input mono" type="number" min="0" step="any" value={form.sellPrice||''} onChange={setN('sellPrice')}/></div>
+              <div><div className="label" style={{marginBottom:4}}>Data</div><input className="input" type="date" value={form.sellDate||''} onChange={set('sellDate')}/></div>
             </div>
-            {form.sellTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>
-              Total vânzare: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.sellTotal)}</span>
-            </div>}
+            {form.sellTotal>0&&<div style={{marginTop:6,fontSize:11,fontFamily:'var(--mono)',color:'var(--text3)'}}>Total vânzare: <span style={{color:'var(--text)',fontWeight:600}}>{fmtC(form.sellTotal)}</span></div>}
           </div>
-
-          {/* Result */}
           {(form.profit!==0||form.roi!==0)&&(
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,padding:'10px 14px',background:'var(--surface2)',borderRadius:8}}>
-              <div>
-                <div className="label" style={{marginBottom:4}}>Profit</div>
-                <div className={`mono ${pnlClass(form.profit)}`} style={{fontSize:16,fontWeight:700}}>{fmtC(form.profit)}</div>
-              </div>
-              <div>
-                <div className="label" style={{marginBottom:4}}>ROI</div>
-                <div className={`mono ${pnlClass(form.roi)}`} style={{fontSize:16,fontWeight:700}}>{fmtPct(form.roi)}</div>
-              </div>
+              <div><div className="label" style={{marginBottom:4}}>Profit</div><div className={`mono ${pnlClass(form.profit)}`} style={{fontSize:16,fontWeight:700}}>{fmtC(form.profit)}</div></div>
+              <div><div className="label" style={{marginBottom:4}}>ROI</div><div className={`mono ${pnlClass(form.roi)}`} style={{fontSize:16,fontWeight:700}}>{fmtPct(form.roi)}</div></div>
             </div>
           )}
-
           {err&&<div style={{color:'var(--red)',fontSize:12,padding:'8px 12px',background:'var(--red-bg)',borderRadius:6,border:'1px solid var(--red-b)'}}>{err}</div>}
         </div>
         <div className="modal-footer">
@@ -203,14 +303,11 @@ export default function FoxPositions() {
   const [showClosedModal,setShowClosedModal] = useState(false)
   const [editItem,      setEditItem]      = useState(null)
   const [view,          setView]          = useState('open')
+  const isMobile = useIsMobile()
 
-  // Company info introdusă manual — nu mai facem auto-fetch Yahoo
-
-  // Separate open vs closed
   const openFox   = useMemo(() => foxData.filter(f => f.status!=='closed'), [foxData])
   const closedFox = useMemo(() => foxData.filter(f => f.status==='closed'), [foxData])
 
-  // Enrich open positions
   const enrichedOpen = useMemo(() => {
     const totalCost = openFox.reduce((s,f)=>s+((f.shares||0)*(f.avgPrice||0)),0)
     return openFox.map(f=>{
@@ -240,7 +337,6 @@ export default function FoxPositions() {
   const totalOpenVal    = enrichedOpen.reduce((s,f)=>s+(f.curVal||0),0)
   const totalOpenProfit = enrichedOpen.reduce((s,f)=>s+(f.profit||0),0)
   const totalOpenRoi    = totalOpenCost>0 ? (totalOpenProfit/totalOpenCost)*100 : 0
-
   const totalClosedProfit = closedFox.reduce((s,f)=>s+(f.profit||0),0)
   const totalClosedCost   = closedFox.reduce((s,f)=>s+(f.buyTotal||0),0)
   const totalClosedRoi    = totalClosedCost>0 ? (totalClosedProfit/totalClosedCost)*100 : 0
@@ -255,9 +351,7 @@ export default function FoxPositions() {
     })
   },[enrichedOpen, sortBy])
 
-  const filteredClosed = useMemo(()=>{
-    return [...closedFox].sort((a,b)=>(b.profit||0)-(a.profit||0))
-  },[closedFox])
+  const filteredClosed = useMemo(()=>[...closedFox].sort((a,b)=>(b.profit||0)-(a.profit||0)),[closedFox])
 
   const saveFox = (item) => {
     const next = editItem ? foxData.map(f=>f.id===editItem.id?item:f) : [...foxData,item]
@@ -297,7 +391,7 @@ export default function FoxPositions() {
         )}
       </div>
 
-      {/* Bannere profit nerealizat + realizat - mereu vizibile */}
+      {/* Bannere profit */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
         <div className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${totalOpenProfit>=0?'var(--green)':'var(--red)'}`}}>
           <div className="label" style={{marginBottom:4,fontSize:9}}>PROFIT NEREALIZAT · FOX</div>
@@ -311,18 +405,18 @@ export default function FoxPositions() {
         </div>
       </div>
 
-      {/* Summary cards detaliu */}
+      {/* Summary */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8,marginBottom:16}}>
         {(view==='open'?[
-          {label:'Cost Total',val:fmtC(totalOpenCost),accent:'var(--text3)',v:null},
-          {label:'Valoare',val:fmtC(totalOpenVal),accent:'var(--blue)',v:null},
+          {label:'Cost Total',val:fmtC(totalOpenCost),accent:'var(--text3)'},
+          {label:'Valoare',val:fmtC(totalOpenVal),accent:'var(--blue)'},
         ]:[
-          {label:'Cost Cumpărare',val:fmtC(totalClosedCost),accent:'var(--text3)',v:null},
-          {label:'Poziții Închise',val:closedFox.length,accent:'var(--purple)',v:null},
+          {label:'Cost Cumpărare',val:fmtC(totalClosedCost),accent:'var(--text3)'},
+          {label:'Poziții Închise',val:closedFox.length,accent:'var(--purple)'},
         ]).map(c=>(
           <div key={c.label} className="card" style={{padding:'10px 14px',borderLeft:`2px solid ${c.accent}`}}>
             <div className="label" style={{marginBottom:4,fontSize:9}}>{c.label}</div>
-            <div className={`mono ${c.v!=null?pnlClass(c.v):''}`} style={{fontSize:'clamp(11px,2.5vw,15px)',fontWeight:700}}>{c.val}</div>
+            <div className="mono" style={{fontSize:'clamp(11px,2.5vw,15px)',fontWeight:700}}>{c.val}</div>
           </div>
         ))}
       </div>
@@ -353,96 +447,116 @@ export default function FoxPositions() {
         </div>
       )}
 
-      {/* ── OPEN TABLE ── */}
+      {/* ── OPEN ── */}
       {view==='open'&&filteredOpen.length>0&&(
-        <div className="card" style={{overflow:'hidden'}}>
-          <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
-            <table className="data-table" style={{minWidth:860}}>
-              <thead>
-                <tr>
-                  <th colSpan={2} style={{background:'var(--surface3)',color:'var(--text3)',borderRight:'1px solid var(--border2)'}}>COMPANIE</th>
-                  <th colSpan={3} style={{background:'var(--surface2)',color:'var(--green)',borderRight:'1px solid var(--border2)'}}>DEȚITERI</th>
-                  <th colSpan={2} style={{background:'var(--surface3)',color:'var(--gold)',borderRight:'1px solid var(--border2)'}}>OBIECTIV</th>
-                  <th colSpan={3} style={{background:'var(--surface2)',color:'var(--blue)'}}>ACTUAL</th>
-                  {isAdmin&&<th style={{background:'var(--surface2)'}}/>}
-                </tr>
-                <tr>
-                  <th style={STICKY_H}>Symbol</th>
-                  <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Cap</th>
-                  <th>Acțiuni</th>
-                  <th>Preț Mediu</th>
-                  <th style={{borderRight:'1px solid var(--border2)'}}>Pondere</th>
-                  <th>Buy Min</th>
-                  <th style={{borderRight:'1px solid var(--border2)'}}>Sell Min–Max</th>
-                  <th>Preț</th>
-                  <th style={{textAlign:'right'}}>Profit</th>
-                  <th style={{textAlign:'right'}}>ROI</th>
-                  {isAdmin&&<th/>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOpen.map(f=>(
-                  <tr key={f.id} style={{background:f.inBuyZone?'rgba(0,212,170,0.04)':f.inSellZone?'rgba(240,180,41,0.04)':''}}>
-                    <td style={{...STICKY,borderRight:'1px solid var(--border)'}}>
-                      <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{f.symbol}</div>
-                      <div style={{fontSize:10,color:'var(--text3)',whiteSpace:'normal',lineHeight:1.3}}>{f.name}</div>
-                    </td>
-                    <td style={{borderRight:'1px solid var(--border)'}}>
-                      <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
-                        {f.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{S_ICON[f.sector]||''} {f.sector}</span>}
-                        {f.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {f.industry}</span>}
-                        {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
-                      </div>
-                    </td>
-                    <td><span className="mono" style={{fontSize:12}}>{f.shares}</span></td>
-                    <td><span className="mono" style={{fontSize:12}}>{fmtC(f.avgPrice)}</span></td>
-                    <td style={{borderRight:'1px solid var(--border)'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:6}}>
-                        <div style={{flex:1,height:4,background:'var(--surface2)',borderRadius:2,minWidth:36}}>
-                          <div style={{height:'100%',width:`${Math.min(f.pondere,100)}%`,background:'var(--blue)',borderRadius:2}}/>
-                        </div>
-                        <span className="mono" style={{fontSize:11,fontWeight:600,color:'var(--blue)',minWidth:34,textAlign:'right'}}>{f.pondere.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      {f.inBuyZone&&<span style={{fontSize:9,color:'var(--green)',fontWeight:700,marginRight:4}}>🟢</span>}
-                      <span className="mono" style={{fontSize:11,color:'var(--gold)'}}>{f.buyMin?`≤${f.buyMin}`:'—'}</span>
-                    </td>
-                    <td style={{borderRight:'1px solid var(--border)'}}>
-                      {f.inSellZone&&<span style={{fontSize:9,color:'var(--gold)',fontWeight:700,marginRight:4}}>⚡</span>}
-                      <span className="mono" style={{fontSize:11,color:'var(--purple)'}}>
-                        {f.sellMin&&f.sellMax?`${f.sellMin}–${f.sellMax}`:f.sellMin?`≥${f.sellMin}`:f.sellMax?`≤${f.sellMax}`:'—'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="mono" style={{fontSize:12,fontWeight:600}}>{f.cur!=null?fmtC(f.cur):'—'}</div>
-                      {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
-                    </td>
-                    <td style={{textAlign:'right'}}>
-                      <span className={`mono ${pnlClass(f.profit)}`} style={{fontSize:12,fontWeight:600}}>{f.profit!=null?fmtC(f.profit):'—'}</span>
-                    </td>
-                    <td style={{textAlign:'right'}}>
-                      <span className={`mono ${pnlClass(f.roi)}`} style={{fontSize:13,fontWeight:700}}>{f.roi!=null?fmtPct(f.roi):'—'}</span>
-                    </td>
-                    {isAdmin&&<td>
-                      <div style={{display:'flex',gap:4}}>
-                        <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={()=>{setEditItem(f);setShowOpenModal(true)}}>✏</button>
-                        <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={()=>deleteFox(f.id)}>✕</button>
-                      </div>
-                    </td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        isMobile ? (
+          <div style={{marginBottom:16}}>
+            {filteredOpen.map(f=>(
+              <MobileFoxOpenCard key={f.id} f={f} isAdmin={isAdmin}
+                onEdit={f=>{setEditItem(f);setShowOpenModal(true)}}
+                onDelete={deleteFox}
+              />
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="card" style={{overflow:'hidden'}}>
+            <div style={{overflowX:'auto',WebkitOverflowScrolling:'touch'}}>
+              <table className="data-table" style={{minWidth:860}}>
+                <thead>
+                  <tr>
+                    <th colSpan={2} style={{background:'var(--surface3)',color:'var(--text3)',borderRight:'1px solid var(--border2)'}}>COMPANIE</th>
+                    <th colSpan={3} style={{background:'var(--surface2)',color:'var(--green)',borderRight:'1px solid var(--border2)'}}>DEȚITERI</th>
+                    <th colSpan={2} style={{background:'var(--surface3)',color:'var(--gold)',borderRight:'1px solid var(--border2)'}}>OBIECTIV</th>
+                    <th colSpan={3} style={{background:'var(--surface2)',color:'var(--blue)'}}>ACTUAL</th>
+                    {isAdmin&&<th style={{background:'var(--surface2)'}}/>}
+                  </tr>
+                  <tr>
+                    <th style={STICKY_H}>Symbol</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Cap</th>
+                    <th>Acțiuni</th>
+                    <th>Preț Mediu</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Pondere</th>
+                    <th>Buy Min</th>
+                    <th style={{borderRight:'1px solid var(--border2)'}}>Sell Min–Max</th>
+                    <th>Preț</th>
+                    <th style={{textAlign:'right'}}>Profit</th>
+                    <th style={{textAlign:'right'}}>ROI</th>
+                    {isAdmin&&<th/>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredOpen.map(f=>(
+                    <tr key={f.id} style={{background:f.inBuyZone?'rgba(0,212,170,0.04)':f.inSellZone?'rgba(240,180,41,0.04)':''}}>
+                      <td style={{...STICKY,borderRight:'1px solid var(--border)'}}>
+                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{f.symbol}</div>
+                        <div style={{fontSize:10,color:'var(--text3)',whiteSpace:'normal',lineHeight:1.3}}>{f.name}</div>
+                      </td>
+                      <td style={{borderRight:'1px solid var(--border)'}}>
+                        <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
+                          {f.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{S_ICON[f.sector]||''} {f.sector}</span>}
+                          {f.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {f.industry}</span>}
+                          {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
+                        </div>
+                      </td>
+                      <td><span className="mono" style={{fontSize:12}}>{f.shares}</span></td>
+                      <td><span className="mono" style={{fontSize:12}}>{fmtC(f.avgPrice)}</span></td>
+                      <td style={{borderRight:'1px solid var(--border)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <div style={{flex:1,height:4,background:'var(--surface2)',borderRadius:2,minWidth:36}}>
+                            <div style={{height:'100%',width:`${Math.min(f.pondere,100)}%`,background:'var(--blue)',borderRadius:2}}/>
+                          </div>
+                          <span className="mono" style={{fontSize:11,fontWeight:600,color:'var(--blue)',minWidth:34,textAlign:'right'}}>{f.pondere.toFixed(1)}%</span>
+                        </div>
+                      </td>
+                      <td>
+                        {f.inBuyZone&&<span style={{fontSize:9,color:'var(--green)',fontWeight:700,marginRight:4}}>🟢</span>}
+                        <span className="mono" style={{fontSize:11,color:'var(--gold)'}}>{f.buyMin?`≤${f.buyMin}`:'—'}</span>
+                      </td>
+                      <td style={{borderRight:'1px solid var(--border)'}}>
+                        {f.inSellZone&&<span style={{fontSize:9,color:'var(--gold)',fontWeight:700,marginRight:4}}>⚡</span>}
+                        <span className="mono" style={{fontSize:11,color:'var(--purple)'}}>
+                          {f.sellMin&&f.sellMax?`${f.sellMin}–${f.sellMax}`:f.sellMin?`≥${f.sellMin}`:f.sellMax?`≤${f.sellMax}`:'—'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="mono" style={{fontSize:12,fontWeight:600}}>{f.cur!=null?fmtC(f.cur):'—'}</div>
+                        {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
+                      </td>
+                      <td style={{textAlign:'right'}}>
+                        <span className={`mono ${pnlClass(f.profit)}`} style={{fontSize:12,fontWeight:600}}>{f.profit!=null?fmtC(f.profit):'—'}</span>
+                      </td>
+                      <td style={{textAlign:'right'}}>
+                        <span className={`mono ${pnlClass(f.roi)}`} style={{fontSize:13,fontWeight:700}}>{f.roi!=null?fmtPct(f.roi):'—'}</span>
+                      </td>
+                      {isAdmin&&<td>
+                        <div style={{display:'flex',gap:4}}>
+                          <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={()=>{setEditItem(f);setShowOpenModal(true)}}>✏</button>
+                          <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={()=>deleteFox(f.id)}>✕</button>
+                        </div>
+                      </td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       )}
 
-      {/* ── CLOSED TABLE ── */}
+      {/* ── CLOSED ── */}
       {view==='closed'&&(
         filteredClosed.length===0 ? (
           <div className="card" style={{padding:'40px 20px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
             Nicio poziție FOX închisă. Adaugă cu butonul "✓ Adaugă Închisă".
+          </div>
+        ) : isMobile ? (
+          <div style={{marginBottom:16}}>
+            {filteredClosed.map(f=>(
+              <MobileFoxClosedCard key={f.id} f={f} isAdmin={isAdmin}
+                onEdit={f=>{setEditItem(f);setShowClosedModal(true)}}
+                onDelete={deleteFox}
+              />
+            ))}
           </div>
         ) : (
           <div className="card" style={{overflow:'hidden'}}>
@@ -459,11 +573,9 @@ export default function FoxPositions() {
                   <tr>
                     <th style={STICKY_H}>Symbol</th>
                     <th style={{borderRight:'1px solid var(--border2)'}}>Domeniu · Cap</th>
-                    <th>Nr. Acțiuni</th>
-                    <th>Preț Mediu</th>
+                    <th>Nr. Acțiuni</th><th>Preț Mediu</th>
                     <th style={{borderRight:'1px solid var(--border2)'}}>Total Cost</th>
-                    <th>Nr. Acțiuni</th>
-                    <th>Preț</th>
+                    <th>Nr. Acțiuni</th><th>Preț</th>
                     <th style={{borderRight:'1px solid var(--border2)'}}>Total</th>
                     <th style={{textAlign:'right'}}>Profit</th>
                     <th style={{textAlign:'right'}}>ROI</th>
@@ -481,16 +593,15 @@ export default function FoxPositions() {
                       <td style={{borderRight:'1px solid var(--border)'}}>
                         <div style={{display:'flex',gap:4,flexWrap:'wrap',alignItems:'center'}}>
                           {f.sector&&<span style={{fontSize:10,color:'var(--blue)',fontWeight:500}}>{S_ICON[f.sector]||''} {f.sector}</span>}
-                          {f.industry&&<span style={{fontSize:9,color:'var(--text3)'}}>· {f.industry}</span>}
                           {f.cap&&<span style={{fontSize:9,padding:'1px 5px',borderRadius:3,background:'var(--surface2)',color:CAP_COLORS[f.cap]||'var(--text3)',border:`1px solid ${CAP_COLORS[f.cap]||'var(--border)'}40`}}>{f.cap}</span>}
                         </div>
                       </td>
-                      <td><span className="mono" style={{fontSize:12}}>{f.buyShares||'—'}</span></td>
-                      <td><span className="mono" style={{fontSize:12}}>{f.buyPrice?fmtC(f.buyPrice):'—'}</span></td>
-                      <td style={{borderRight:'1px solid var(--border)'}}><span className="mono" style={{fontSize:12,fontWeight:600}}>{f.buyTotal?fmtC(f.buyTotal):'—'}</span></td>
-                      <td><span className="mono" style={{fontSize:12}}>{f.sellShares||'—'}</span></td>
-                      <td><span className="mono" style={{fontSize:12}}>{f.sellPrice?fmtC(f.sellPrice):'—'}</span></td>
-                      <td style={{borderRight:'1px solid var(--border)'}}><span className="mono" style={{fontSize:12,fontWeight:600}}>{f.sellTotal?fmtC(f.sellTotal):'—'}</span></td>
+                      <td><span className="mono">{f.buyShares||'—'}</span></td>
+                      <td><span className="mono">{f.buyPrice?fmtC(f.buyPrice):'—'}</span></td>
+                      <td style={{borderRight:'1px solid var(--border)'}}><span className="mono" style={{fontWeight:600}}>{f.buyTotal?fmtC(f.buyTotal):'—'}</span></td>
+                      <td><span className="mono">{f.sellShares||'—'}</span></td>
+                      <td><span className={`mono ${pnlClass(f.profit)}`} style={{fontWeight:600}}>{f.sellPrice?fmtC(f.sellPrice):'—'}</span></td>
+                      <td style={{borderRight:'1px solid var(--border)'}}><span className={`mono ${pnlClass(f.profit)}`} style={{fontWeight:600}}>{f.sellTotal?fmtC(f.sellTotal):'—'}</span></td>
                       <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(f.profit)}`} style={{fontSize:13,fontWeight:700}}>{f.profit!=null?fmtC(f.profit):'—'}</span></td>
                       <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(f.roi)}`} style={{fontSize:13,fontWeight:700}}>{f.roi!=null?fmtPct(f.roi):'—'}</span></td>
                       {isAdmin&&<td>
@@ -506,8 +617,7 @@ export default function FoxPositions() {
                   <tr className="total-row">
                     <td colSpan={4} style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>TOTAL ÎNCHISE</td>
                     <td><span className="mono" style={{fontWeight:700}}>{fmtC(totalClosedCost)}</span></td>
-                    <td colSpan={2}/>
-                    <td style={{borderRight:'1px solid var(--border)'}}/>
+                    <td colSpan={3}/>
                     <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(totalClosedProfit)}`} style={{fontWeight:700}}>{fmtC(totalClosedProfit)}</span></td>
                     <td style={{textAlign:'right'}}><span className={`mono ${pnlClass(totalClosedRoi)}`} style={{fontWeight:700}}>{fmtPct(totalClosedRoi)}</span></td>
                     {isAdmin&&<td/>}
@@ -519,9 +629,9 @@ export default function FoxPositions() {
         )
       )}
 
-      {/* Modals */}
       {showOpenModal&&isAdmin&&<OpenFoxModal {...modalProps} item={editItem?.status!=='closed'?editItem:null} onSave={saveFox}/>}
       {showClosedModal&&isAdmin&&<ClosedFoxModal {...modalProps} item={editItem?.status==='closed'?editItem:null} onSave={saveFox}/>}
     </div>
   )
 }
+
