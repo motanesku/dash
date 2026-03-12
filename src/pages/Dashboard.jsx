@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
-import { requestNotificationPermission, checkPriceAlerts } from '../lib/notifications.js'
+import { requestNotificationPermission } from '../lib/notifications.js'
+import { loadAlerts, checkAndNotify } from '../lib/alerts.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
@@ -415,11 +416,9 @@ export default function Dashboard() {
   // Verifică alerte de preț la fiecare update de prețuri
   useEffect(() => {
     if (notifPerm !== 'granted') return;
-    const alerts = txs
-      .filter(t => t.targetPrice || t.stopLoss)
-      .map(t => ({ sym: t.sym, targetPrice: t.targetPrice, stopLoss: t.stopLoss }))
-      .filter((v, i, a) => a.findIndex(x => x.sym === v.sym) === i); // unic per simbol
-    checkPriceAlerts(prices, alerts);
+    const alerts = loadAlerts();
+    if (!Object.keys(alerts).length) return;
+    checkAndNotify(prices, marketData, alerts);
   }, [prices]);
 
   async function handleEnableNotif() {
@@ -504,3 +503,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
