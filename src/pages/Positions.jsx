@@ -54,7 +54,7 @@ function aggregateBySymbol(positions) {
 }
 
 // ── Mobile Position Card ─────────────────────────────────────
-function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children }) {
+function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts }) {
   const info = companyInfo[p.symbol] || {}
   const brokerList = p.brokers || [p.broker]
   const unrColor = (p.unrealizedPnl||0) >= 0 ? 'var(--green)' : 'var(--red)'
@@ -88,10 +88,22 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
               ))}
             </div>
           </div>
-          {/* Valoare + unrealized */}
+          {/* Valoare + unrealized + alert */}
           <div style={{textAlign:'right'}}>
-            <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
-              {p.curValue ? fmtC(p.curValue, p.currency) : '—'}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6}}>
+              <button
+                onClick={e=>{e.stopPropagation();onAlert&&onAlert(p.symbol)}}
+                title="Alerte preț"
+                style={{
+                  background:'none',border:'none',cursor:'pointer',fontSize:13,
+                  padding:'2px 3px',lineHeight:1,
+                  color: (() => { const a=alerts?.[p.symbol]; return a&&(a.targetPrice||a.stopLoss||a.dayChangePct||a.vixPrag)?'#f0b429':'var(--text3)'; })(),
+                  opacity: (() => { const a=alerts?.[p.symbol]; return a&&(a.targetPrice||a.stopLoss||a.dayChangePct||a.vixPrag)?1:0.4; })(),
+                }}
+              >🔔</button>
+              <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
+                {p.curValue ? fmtC(p.curValue, p.currency) : '—'}
+              </div>
             </div>
             <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:unrColor}}>
               {p.unrealizedPnl!=null ? fmtC(p.unrealizedPnl,p.currency) : '—'}
@@ -483,6 +495,8 @@ export default function Positions({ onEditTx }) {
                 onEditInfo={sym=>setEditInfoSym(sym)}
                 onSelect={pos=>setSelectedPos(selectedPos?.symbol===pos.symbol?null:pos)}
                 selected={selectedPos?.symbol===p.symbol}
+                onAlert={sym=>setAlertSym(sym)}
+                alerts={alerts}
               >
                 <PriceChart symbol={p.symbol} height={200}/>
               </MobilePositionCard>
@@ -520,9 +534,21 @@ export default function Positions({ onEditTx }) {
                     <tr key={p.symbol+(p.broker||'')} style={{cursor:'pointer'}}
                       onClick={()=>setSelectedPos(selectedPos?.symbol===p.symbol?null:p)}>
                       <td style={{...STICKY, borderRight:'1px solid var(--border)'}}>
-                        <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',display:'inline-flex',alignItems:'center',gap:4}}
-                          onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
-                          {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5,cursor:'pointer'}}>✏</span>}
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--text)',display:'inline-flex',alignItems:'center',gap:4}}
+                            onClick={e=>{if(!isAdmin)return;e.stopPropagation();setEditInfoSym(p.symbol)}}>
+                            {p.symbol}{isAdmin&&<span style={{fontSize:9,color:'var(--text3)',opacity:0.5,cursor:'pointer'}}>✏</span>}
+                          </div>
+                          <button
+                            onClick={e=>{e.stopPropagation();setAlertSym(p.symbol)}}
+                            title="Alerte preț"
+                            style={{
+                              background:'none',border:'none',cursor:'pointer',fontSize:11,
+                              padding:'2px 3px',borderRadius:4,lineHeight:1,
+                              color: (() => { const a=alerts[p.symbol]; return a&&(a.targetPrice||a.stopLoss||a.dayChangePct||a.vixPrag) ? '#f0b429' : 'var(--text3)'; })(),
+                              opacity: (() => { const a=alerts[p.symbol]; return a&&(a.targetPrice||a.stopLoss||a.dayChangePct||a.vixPrag) ? 1 : 0.4; })(),
+                            }}
+                          >🔔</button>
                         </div>
                         <div style={{fontSize:10,color:'var(--text3)',marginTop:1,lineHeight:1.3}}>{p.name}</div>
                         <div style={{display:'flex',gap:3,marginTop:3,flexWrap:'wrap'}}>
