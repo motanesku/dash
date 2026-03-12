@@ -14,9 +14,9 @@ const STICKY   = { position:'sticky', left:0, zIndex:2, background:'var(--surfac
 const STICKY_H = { position:'sticky', left:0, zIndex:3, background:'var(--bg2)' }
 
 function useIsMobile() {
-  const [mobile, setMobile] = useState(window.innerWidth < 768)
+  const [mobile, setMobile] = useState(window.innerWidth < 1024)
   useEffect(() => {
-    const fn = () => setMobile(window.innerWidth < 768)
+    const fn = () => setMobile(window.innerWidth < 1024)
     window.addEventListener('resize', fn)
     return () => window.removeEventListener('resize', fn)
   }, [])
@@ -759,6 +759,14 @@ export default function Positions({ onEditTx }) {
         </div>
       )}
       {editInfoSym && <CompanyEditModal symbol={editInfoSym} onClose={()=>setEditInfoSym(null)}/>}
+      {alertSym && (
+        <AlertModal
+          sym={alertSym}
+          currentPrice={prices[alertSym]?.price ?? null}
+          onClose={() => setAlertSym(null)}
+        />
+      )}
     </div>
   )
 }
+
