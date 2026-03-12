@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import useStore from '../lib/store.js'
 import { calcPortfolio, fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import PriceChart from '../components/PriceChart.jsx'
@@ -7,6 +7,7 @@ import { CompanyInfoCard, SECTOR_ICONS, CAP_COLORS as CAP_COLORS_NEW, CAPS, SECT
 import Sparkline from '../components/Sparkline.jsx'
 import AlertModal from '../components/AlertModal.jsx'
 import { loadAlerts } from '../lib/alerts.js'
+import { fetchBetas, betaLabel, calcPortfolioBeta } from '../lib/beta.js'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
 const CAP_COLORS    = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
@@ -59,7 +60,7 @@ function aggregateBySymbol(positions) {
 }
 
 // ── Mobile Position Card ─────────────────────────────────────
-function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts }) {
+function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts, betas, betaTooltip, setBetaTooltip }) {
   const info = companyInfo[p.symbol] || {}
   const brokerList = p.brokers || [p.broker]
   const unrColor = (p.unrealizedPnl||0) >= 0 ? 'var(--green)' : 'var(--red)'
@@ -113,6 +114,41 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
             <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:600,color:unrColor}}>
               {p.unrealizedPct!=null ? fmtPct(p.unrealizedPct) : ''}
             </div>
+            {/* Beta */}
+            {(() => {
+              const b = betas?.[p.symbol]
+              if (b == null) return null
+              const lbl = betaLabel(b)
+              const isOpen = betaTooltip === p.symbol
+              return (
+                <div style={{position:'relative',marginTop:4}}>
+                  <div
+                    onClick={e=>{e.stopPropagation();setBetaTooltip(isOpen?null:p.symbol)}}
+                    style={{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3,
+                      fontFamily:'var(--mono)',fontSize:10,color:lbl.color,fontWeight:600}}
+                  >
+                    β {b.toFixed(2)} {lbl.emoji}
+                  </div>
+                  {isOpen && (
+                    <div style={{
+                      position:'absolute',right:0,top:'100%',zIndex:10,marginTop:4,
+                      background:'var(--surface)',border:'1px solid var(--border2)',
+                      borderRadius:8,padding:'8px 12px',minWidth:200,
+                      boxShadow:'var(--shadow)',fontSize:11,color:'var(--text2)',
+                      fontFamily:'var(--mono)',lineHeight:1.5,
+                    }}>
+                      <div style={{fontWeight:700,color:lbl.color,marginBottom:4}}>{lbl.emoji} {lbl.text}</div>
+                      <div>β {b.toFixed(2)} față de S&P 500</div>
+                      <div style={{color:'var(--text3)',marginTop:3,fontSize:10}}>
+                        {b > 0
+                          ? `La o mișcare de 10% a pieței, această poziție se mișcă ~${Math.abs(b*10).toFixed(1)}%`
+                          : 'Se mișcă invers față de piață'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
@@ -271,6 +307,17 @@ export default function Positions({ onEditTx }) {
   const alerts = loadAlerts()
   const [editInfoSym, setEditInfoSym]   = useState(null)
   const [sortBy, setSortBy]           = useState('value')
+  const [betas, setBetas]             = useState({})
+  const [betaTooltip, setBetaTooltip] = useState(null)
+
+  // Fetch beta pentru toate simbolurile deschise
+  useEffect(() => {
+    const syms = [...new Set(positions.map(p => p.symbol))]
+    if (!syms.length) return
+    fetchBetas(syms).then(b => setBetas(b)).catch(() => {})
+  }, [positions.map(p => p.symbol).join(',')])
+
+  const portfolioBeta = useMemo(() => calcPortfolioBeta(filteredOpen, betas), [filteredOpen, betas])
   const [view, setView]               = useState('open')
 
   // Per-broker stats
@@ -502,6 +549,9 @@ export default function Positions({ onEditTx }) {
                 selected={selectedPos?.symbol===p.symbol}
                 onAlert={sym=>setAlertSym(sym)}
                 alerts={alerts}
+                betas={betas}
+                betaTooltip={betaTooltip}
+                setBetaTooltip={setBetaTooltip}
               >
                 <PriceChart symbol={p.symbol} height={200}/>
               </MobilePositionCard>
@@ -517,9 +567,10 @@ export default function Positions({ onEditTx }) {
                 <col style={{width:'10%'}}/>
                 <col style={{width:'12%'}}/>
                 <col style={{width:'12%'}}/>
-                <col style={{width:'11%'}}/>
-                <col style={{width:'11%'}}/>
-                <col style={{width:'11%'}}/>
+                <col style={{width:'10%'}}/>
+                <col style={{width:'10%'}}/>
+                <col style={{width:'9%'}}/>
+                <col style={{width:'9%'}}/>
               </colgroup>
               <thead><tr>
                 <th style={STICKY_H}>Symbol</th>
@@ -529,6 +580,7 @@ export default function Positions({ onEditTx }) {
                 <th style={{textAlign:'right', borderRight:'3px solid var(--border2)'}}>Cost Total</th>
                 <th style={{textAlign:'right'}}>Preț azi</th>
                 <th style={{textAlign:'right'}}>Nerealizat</th>
+                <th style={{textAlign:'center',color:'var(--text3)',fontSize:10}}>Beta</th>
                 <th style={{textAlign:'center',color:'var(--text3)',fontSize:10}}>30z</th>
               </tr></thead>
               <tbody>
@@ -583,6 +635,41 @@ export default function Positions({ onEditTx }) {
                         <div className={`mono ${pnlClass(p.unrealizedPnl)}`} style={{fontSize:12,fontWeight:700}}>{p.unrealizedPnl!=null?fmtC(p.unrealizedPnl,p.currency):'—'}</div>
                         <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10,marginTop:2}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
                       </td>
+                      <td style={{textAlign:'center',padding:'4px 8px',position:'relative'}}>
+                        {(() => {
+                          const b = betas[p.symbol]
+                          if (b == null) return <span style={{color:'var(--text3)',fontSize:10}}>—</span>
+                          const lbl = betaLabel(b)
+                          return (
+                            <div style={{position:'relative',display:'inline-block'}}>
+                              <div
+                                onMouseEnter={e=>setBetaTooltip(p.symbol)}
+                                onMouseLeave={e=>setBetaTooltip(null)}
+                                style={{cursor:'default',fontFamily:'var(--mono)',fontSize:11,fontWeight:600,color:lbl.color}}
+                              >
+                                {lbl.emoji} {b.toFixed(2)}
+                              </div>
+                              {betaTooltip===p.symbol && (
+                                <div style={{
+                                  position:'absolute',right:0,top:'100%',zIndex:20,marginTop:4,
+                                  background:'var(--surface)',border:'1px solid var(--border2)',
+                                  borderRadius:8,padding:'8px 12px',minWidth:210,
+                                  boxShadow:'var(--shadow)',fontSize:11,color:'var(--text2)',
+                                  fontFamily:'var(--mono)',lineHeight:1.5,whiteSpace:'nowrap',
+                                }}>
+                                  <div style={{fontWeight:700,color:lbl.color,marginBottom:4}}>{lbl.emoji} {lbl.text}</div>
+                                  <div>β {b.toFixed(2)} față de S&P 500</div>
+                                  <div style={{color:'var(--text3)',marginTop:3,fontSize:10}}>
+                                    {b > 0
+                                      ? `La o mișcare de 10% a pieței → ~${Math.abs(b*10).toFixed(1)}%`
+                                      : 'Se mișcă invers față de piață'}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </td>
                       <td style={{textAlign:'center',padding:'4px 6px'}}>
                         <Sparkline symbol={p.symbol} width={72} height={28} days={30} />
                       </td>
@@ -603,6 +690,10 @@ export default function Positions({ onEditTx }) {
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontWeight:700}}>{fmtC(totalUnrealized)}</div>
                     <div className={`mono ${pnlClass(totalUnrealized)}`} style={{fontSize:10}}>{totalCost>0?fmtPct(totalUnrealized/totalCost*100):''}</div>
                   </td>
+                  <td style={{textAlign:'center',fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)'}}>
+                    {portfolioBeta != null ? (() => { const lbl = betaLabel(portfolioBeta); return <span style={{color:lbl.color}}>{lbl.emoji} {portfolioBeta.toFixed(2)}</span> })() : '—'}
+                  </td>
+                  <td/>
                 </tr>
               </tfoot>
             </table>
