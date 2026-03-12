@@ -554,7 +554,7 @@ export default function Positions({ onEditTx }) {
                 betaTooltip={betaTooltip}
                 setBetaTooltip={setBetaTooltip}
               >
-                <PriceChart symbol={p.symbol} height={200}/>
+                <PriceChart symbol={p.symbol} height={200} avgPrice={p.avgPrice ?? null}/>
               </MobilePositionCard>
             ))}
           </div>
@@ -852,7 +852,7 @@ export default function Positions({ onEditTx }) {
             </div>
             <button className="btn btn-ghost btn-sm" onClick={()=>setSelectedPos(null)}>✕</button>
           </div>
-          <PriceChart symbol={selectedPos.symbol} height={220}/>
+          <PriceChart symbol={selectedPos.symbol} height={220} avgPrice={selectedPos.avgPrice ?? null}/>
         </div>
       )}
       {editInfoSym && <CompanyEditModal symbol={editInfoSym} onClose={()=>setEditInfoSym(null)}/>}
