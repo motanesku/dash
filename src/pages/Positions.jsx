@@ -579,19 +579,7 @@ export default function Positions({ onEditTx }) {
                         <div className={`mono ${pnlClass(p.unrealizedPct)}`} style={{fontSize:10,marginTop:2}}>{p.unrealizedPct!=null?fmtPct(p.unrealizedPct):'—'}</div>
                       </td>
                       <td style={{textAlign:'center',padding:'4px 6px'}}>
-                        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3}}>
-                          <Sparkline symbol={p.symbol} width={72} height={28} days={30} />
-                          <button
-                            onClick={e=>{e.stopPropagation();setAlertSym(p.symbol)}}
-                            style={{
-                              background:'none',border:'none',cursor:'pointer',
-                              fontSize:12,padding:'1px 4px',borderRadius:4,
-                              color: alerts[p.symbol]?.targetPrice||alerts[p.symbol]?.stopLoss||alerts[p.symbol]?.dayChangePct||alerts[p.symbol]?.vixPrag ? '#f0b429' : 'var(--text3)',
-                              opacity:0.8,
-                            }}
-                            title="Configurează alerte"
-                          >🔔</button>
-                        </div>
+                        <Sparkline symbol={p.symbol} width={72} height={28} days={30} />
                       </td>
                     </tr>
                   )
