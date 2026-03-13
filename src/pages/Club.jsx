@@ -36,7 +36,20 @@ export default function Club() {
   const [contribForm, setContribForm] = useState({investorId:'', month:new Date().toISOString().slice(0,7), amount:''})
   const [clubValOverride, setClubValOverride] = useState('')
 
-  const usdRon = marketData['RON=X']?.price || prices['RON=X']?.price
+  // Citim cursul RON din toate sursele posibile
+  const usdRon = marketData['RON=X']?.price 
+    || prices['RON=X']?.price
+    || (() => {
+        try {
+          // Fallback: citim direct din cache-ul de market din localStorage
+          const cached = localStorage.getItem('ptf_v6_market')
+          if (cached) {
+            const m = JSON.parse(cached)
+            return m['RON=X']?.price || null
+          }
+        } catch {}
+        return null
+      })()
   const totalStocks = positions.reduce((s,p)=>s+(p.curValue||0),0)
   const totalCash = Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const totalPortfolio = totalStocks + totalCash
@@ -314,4 +327,3 @@ export default function Club() {
     </div>
   )
 }
-
