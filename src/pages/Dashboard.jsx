@@ -10,6 +10,7 @@ import SectorPieChart from '../components/SectorPieChart.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
 import { fetchBetas, betaLabel, calcPortfolioBeta } from '../lib/beta.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
+import CorrelationHeatmap from '../components/CorrelationHeatmap.jsx'
 
 const COLORS = ['#58a6ff','#00d4aa','#a78bfa','#f0b429','#ff5572','#34d399','#fb923c','#60a5fa']
 
@@ -196,6 +197,7 @@ export default function Dashboard() {
     {id:'alloc',label:'▦ Alocare'},
     {id:'monthly',label:'📊 Lunar'},
     {id:'sectors',label:'🥧 Sectoare'},
+    {id:'corr',label:'🔗 Corelații'},
   ]
 
   return (
@@ -264,6 +266,7 @@ export default function Dashboard() {
           {chartTab==='alloc'   && <AllocChart positions={positions}/>}
           {chartTab==='monthly' && <MonthlyChart txs={txs} prices={prices}/>}
           {chartTab==='sectors' && <SectorPieChart positions={positions} companyInfo={companyInfo}/>}
+          {chartTab==='corr'    && <CorrelationHeatmap positions={positions}/>}
         </div>
       )}
 
