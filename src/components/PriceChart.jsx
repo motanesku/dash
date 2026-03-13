@@ -61,7 +61,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
           crosshairMarkerBorderColor: '#4d9fff',
           crosshairMarkerBackgroundColor: '#0a0e1a',
           lastValueVisible: true,
-          priceLineVisible: false,
+          priceLineVisible: true,
         })
 
         setLoading(true)
@@ -87,19 +87,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
             { time: points[points.length - 1].date, value: avgPrice },
           ])
 
-          // Etichetă AVG — desenată manual pe canvas în stânga
-          const priceToCoord = series.priceToCoordinate.bind(series)
-          chart.subscribeCrosshairMove(() => {}) // trigger re-render
-          
-          // Price line cu titlu pe stânga via watermark workaround
-          series.createPriceLine({
-            price: avgPrice,
-            color: '#f0b42900', // transparent — doar pentru poziționare
-            lineWidth: 0,
-            lineStyle: 2,
-            axisLabelVisible: true,
-            title: `AVG ${avgPrice.toFixed(2)}`,
-          })
+
         }
 
         chart.timeScale().fitContent()
