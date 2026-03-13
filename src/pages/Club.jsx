@@ -36,9 +36,12 @@ export default function Club() {
   const [contribForm, setContribForm] = useState({investorId:'', month:new Date().toISOString().slice(0,7), amount:''})
   const [clubValOverride, setClubValOverride] = useState('')
 
-  const usdRon = marketData['RON=X']?.price
-  const totalPortfolio = positions.reduce((s,p)=>s+(p.curValue||0),0) + Object.values(cashByBroker).reduce((s,v)=>s+v,0)
+  const usdRon = marketData['RON=X']?.price || prices['RON=X']?.price
+  const totalStocks = positions.reduce((s,p)=>s+(p.curValue||0),0)
+  const totalCash = Object.values(cashByBroker).reduce((s,v)=>s+v,0)
+  const totalPortfolio = totalStocks + totalCash
   const autoValueRON = usdRon ? totalPortfolio * usdRon : null
+  // Folosim mereu valoarea auto (live) — override manual doar dacă admin setează explicit
   const displayValue = club.totalValue > 0 ? club.totalValue : (autoValueRON || 0)
 
   const stats = useMemo(() => {
@@ -118,8 +121,11 @@ export default function Club() {
             </div>}
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
-            {autoValueRON&&<div style={{fontSize:11,color:'var(--blue)',fontFamily:'var(--mono)',background:'var(--blue-bg)',padding:'4px 10px',borderRadius:5,border:'1px solid var(--blue-b)'}}>
-              auto: {Math.round(totalPortfolio)} USD × {usdRon?.toFixed(2)} = {Math.round(autoValueRON)} RON
+            {usdRon&&<div style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)',background:'var(--surface2)',padding:'4px 10px',borderRadius:5,border:'1px solid var(--border)'}}>
+              {Math.round(totalStocks)} stocuri + {Math.round(totalCash)} cash = {Math.round(totalPortfolio)} USD × {usdRon?.toFixed(2)} RON
+            </div>}
+            {!usdRon&&<div style={{fontSize:11,color:'var(--gold)',fontFamily:'var(--mono)',background:'var(--gold-bg)',padding:'4px 10px',borderRadius:5,border:'1px solid rgba(240,180,41,0.25)'}}>
+              ⏳ se încarcă cursul USD/RON...
             </div>}
             {isAdmin&&<div style={{display:'flex',gap:8,alignItems:'center'}}>
               <input className="input mono" type="number" placeholder="Override RON..." value={clubValOverride}
@@ -308,3 +314,4 @@ export default function Club() {
     </div>
   )
 }
+
