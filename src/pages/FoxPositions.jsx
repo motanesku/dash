@@ -379,8 +379,27 @@ export default function FoxPositions() {
             🦊 Poziții FOX
             <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
           </h2>
-          <div style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
-            {openFox.length} deschise · {closedFox.length} închise
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
+              {openFox.length} deschise · {closedFox.length} închise
+            </span>
+            <a
+              href="https://storage.rcs-rds.ro/links/e4f08490-3d2b-4f91-bc76-85f59a4e7f8c"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display:'inline-flex',alignItems:'center',gap:4,
+                fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
+                color:'var(--blue)',textDecoration:'none',
+                background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
+                borderRadius:5,padding:'3px 8px',
+                transition:'opacity .15s',
+              }}
+              onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='1'}
+            >
+              ☁️ Share Drive
+            </a>
           </div>
         </div>
         {isAdmin&&(
@@ -634,4 +653,5 @@ export default function FoxPositions() {
     </div>
   )
 }
+
 
