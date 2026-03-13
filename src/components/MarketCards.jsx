@@ -179,9 +179,10 @@ function Card({ sym, label, decimals = 2, prices }) {
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
-      minWidth: 130,
-      width: 130,
+      minWidth: 'calc(50% - 4px)',
+      width: 'calc(50% - 4px)',
       flexShrink: 0,
+      scrollSnapAlign: 'start',
     }}>
       {/* Header */}
       <div style={{ padding: '8px 10px 3px' }}>
@@ -247,6 +248,7 @@ export default function MarketCards({ prices }) {
         WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
         paddingBottom: 4,
+        scrollSnapType: 'x mandatory',
       }}>
         {syms.map(({ sym, label, decimals }) => (
           <Card key={sym} sym={sym} label={label} decimals={decimals} prices={prices}/>
@@ -255,5 +257,3 @@ export default function MarketCards({ prices }) {
     </div>
   )
 }
-
-
