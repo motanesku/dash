@@ -179,16 +179,16 @@ function Card({ sym, label, decimals = 2, prices }) {
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
-      minWidth: 160,
-      width: 160,
+      minWidth: 130,
+      width: 130,
       flexShrink: 0,
     }}>
       {/* Header */}
-      <div style={{ padding: '10px 12px 4px' }}>
+      <div style={{ padding: '8px 10px 3px' }}>
         <div style={{ fontSize: 11, color: 'var(--text3)', fontWeight: 600, marginBottom: 2 }}>
           {label}
         </div>
-        <div style={{ fontFamily: 'var(--mono)', fontSize: 'clamp(16px,4vw,20px)', fontWeight: 800, color: 'var(--text)', lineHeight: 1.1 }}>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 'clamp(14px,3.5vw,17px)', fontWeight: 800, color: 'var(--text)', lineHeight: 1.1 }}>
           {fmt(price, decimals)}
         </div>
         <div style={{ fontSize: 12, fontWeight: 700, color, marginTop: 2 }}>
