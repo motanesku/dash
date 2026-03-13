@@ -42,11 +42,7 @@ function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
           </div>
         </div>
         <div style={{textAlign:'right'}}>
-          <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:16,color:'var(--text)'}}>
-            {f.cur!=null ? fmtC(f.cur) : '—'}
-          </div>
-          {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:11}}>{fmtPct(f.dayChg)}</div>}
-          <div className={`mono ${pnlClass(f.profit)}`} style={{fontSize:12,fontWeight:700,marginTop:2}}>
+          <div className={`mono ${pnlClass(f.profit)}`} style={{fontSize:16,fontWeight:700}}>
             {f.profit!=null?fmtC(f.profit):'—'}
           </div>
           <div className={`mono ${pnlClass(f.roi)}`} style={{fontSize:11}}>
@@ -61,9 +57,13 @@ function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>ACȚIUNI</div>
           <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600}}>{f.shares}</div>
         </div>
-        <div>
+        <div style={{textAlign:'center'}}>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ MEDIU</div>
           <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(f.avgPrice)}</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text)',marginTop:4,fontWeight:700}}>
+            {f.cur!=null ? fmtC(f.cur) : '—'}
+          </div>
+          {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
         </div>
         <div style={{textAlign:'right'}}>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PONDERE</div>
@@ -379,7 +379,7 @@ export default function FoxPositions() {
             🦊 Poziții FOX
             <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
           </h2>
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%'}}>
             <span style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
               {openFox.length} deschise · {closedFox.length} închise
             </span>
@@ -393,7 +393,7 @@ export default function FoxPositions() {
                 color:'var(--blue)',textDecoration:'none',
                 background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
                 borderRadius:5,padding:'3px 8px',
-                transition:'opacity .15s',marginLeft:'auto',
+                transition:'opacity .15s',
               }}
               onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
               onMouseLeave={e=>e.currentTarget.style.opacity='1'}
