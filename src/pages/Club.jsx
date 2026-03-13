@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
 import { fmtC, fmtPct, pnlClass, fmtDate } from '../lib/portfolio.js'
 import { calcPortfolio } from '../lib/portfolio.js'
@@ -35,9 +35,24 @@ export default function Club() {
   const [invForm,    setInvForm]    = useState({name:'', color:CLUB_COLORS[0]})
   const [contribForm, setContribForm] = useState({investorId:'', month:new Date().toISOString().slice(0,7), amount:''})
 
-  const usdRon = marketData['RON=X']?.price || prices['RON=X']?.price || (() => {
-    try { const m = JSON.parse(localStorage.getItem('ptf_v6_market')||'{}'); return m['RON=X']?.price||null } catch { return null }
-  })()
+  const [usdRon, setUsdRon] = useState(() => {
+    // Încearcă din toate sursele locale la init
+    return marketData['RON=X']?.price
+      || prices['RON=X']?.price
+      || (() => { try { return JSON.parse(localStorage.getItem('ptf_v6_market')||'{}')['RON=X']?.price || JSON.parse(localStorage.getItem('ptf_v6_prices')||'{}')['RON=X']?.price || null } catch { return null } })()
+  })
+
+  // Fetch direct RON=X din Worker — independent de store
+  useEffect(() => {
+    if (usdRon) return // avem deja cursul
+    fetch('https://worker.danut-fagadau.workers.dev/api/prices?symbols=RON=X')
+      .then(r => r.json())
+      .then(j => {
+        const rate = j?.prices?.['RON=X']?.price
+        if (rate) setUsdRon(rate)
+      })
+      .catch(() => {})
+  }, [])
   const totalStocks = positions.reduce((s,p)=>s+(p.curValue||0),0)
   const totalCash = Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const totalPortfolio = totalStocks + totalCash
@@ -306,4 +321,5 @@ export default function Club() {
     </div>
   )
 }
+
 
