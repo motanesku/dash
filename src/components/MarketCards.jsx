@@ -168,7 +168,7 @@ function Card({ sym, label, decimals = 2, prices }) {
 
   const color  = positive ? '#26a69a' : '#ef5350'
   const pctStr = changePct != null
-    ? `${positive ? '+' : ''}${changePct.toFixed(2)}%`
+    ? `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`
     : '—'
 
   return (
@@ -195,7 +195,7 @@ function Card({ sym, label, decimals = 2, prices }) {
           {pctStr}
           {change != null && (
             <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 6, fontWeight: 400 }}>
-              {positive ? '+' : ''}{fmt(change, decimals)}
+              {change >= 0 ? '+' : ''}{fmt(change, decimals)}
             </span>
           )}
         </div>
@@ -255,4 +255,5 @@ export default function MarketCards({ prices }) {
     </div>
   )
 }
+
 
