@@ -158,7 +158,7 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
             <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CAP</div>
             <div style={{fontSize:11,color:CAP_COLORS_NEW[info.cap]||'var(--text3)',fontWeight:600}}>{info.cap||'—'}</div>
           </div>
-          <div style={{textAlign:'center'}}>
+          <div>
             <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>CUR PRICE</div>
             <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:600,color:'var(--text)'}}>{p.curPrice ? fmtC(p.curPrice,p.currency) : '—'}</div>
           </div>
