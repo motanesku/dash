@@ -202,9 +202,10 @@ export default function Dashboard() {
     <div className="fade-up">
       {notifPerm==='default' && 'Notification' in window && (
         <div onClick={handleEnableNotif} style={{
-          position:'fixed',bottom:20,left:20,zIndex:99,background:'var(--surface)',border:'1px solid var(--border2)',
-          borderRadius:8,padding:'8px 14px',display:'flex',alignItems:'center',gap:8,
-          fontSize:11,color:'var(--text2)',fontFamily:'var(--mono)',boxShadow:'var(--shadow)',cursor:'pointer',
+          display:'flex',alignItems:'center',gap:8,marginBottom:10,
+          padding:'8px 14px',borderRadius:8,border:'1px solid var(--border2)',
+          background:'var(--surface)',cursor:'pointer',
+          fontSize:11,color:'var(--text2)',fontFamily:'var(--mono)',
         }}>🔔 Activează notificări</div>
       )}
 
