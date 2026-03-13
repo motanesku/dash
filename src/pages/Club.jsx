@@ -233,7 +233,7 @@ export default function Club() {
             display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,
           }}>
             <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)',fontWeight:700}}>TOTAL {stats.length} INVESTITORI</span>
-            <div style={{display:'flex',gap:20'}}>
+            <div style={{display:'flex',gap:20}}>
               <div style={{textAlign:'center'}}>
                 <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:2}}>INVESTIT</div>
                 <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{fmtRON(totalInvested)}</div>
