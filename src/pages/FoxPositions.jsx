@@ -393,12 +393,12 @@ export default function FoxPositions() {
                 color:'var(--blue)',textDecoration:'none',
                 background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
                 borderRadius:5,padding:'3px 8px',
-                transition:'opacity .15s',
+                transition:'opacity .15s',marginLeft:'auto',
               }}
               onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
               onMouseLeave={e=>e.currentTarget.style.opacity='1'}
             >
-              ☁️ Share Drive
+              <span className="cloud-icon">☁️</span> Share Drive
             </a>
           </div>
         </div>
