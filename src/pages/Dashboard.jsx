@@ -237,8 +237,8 @@ export default function Dashboard() {
       </div>
 
       <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20 }}>
-        <StatCard delay={1} label="Valoare Totală" value={fmtC(agg.totalCurValue)} sub={`${positions.length} poziții`} accent="var(--blue)"/>
-        <StatCard delay={2} label="Cost Investit" value={fmtC(agg.totalCostBasis)} sub={`${txs.filter(t=>t.type!=='DEPOSIT').length} tranzacții`} accent="var(--text3)"/>
+        <StatCard delay={1} label="Total Investit" value={fmtC(agg.totalCostBasis + cashTotal)} sub={`stocuri + ${fmtC(cashTotal)} cash`} accent="var(--text3)"/>
+        <StatCard delay={2} label="Valoare Actuală" value={fmtC(agg.totalCurValue + cashTotal)} sub={`${positions.length} poziții + cash`} accent="var(--blue)"/>
         <StatCard delay={3} label="Profit Nerealizat" value={fmtC(agg.totalUnrealized)} sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)} accent={agg.totalUnrealized>=0?'var(--green)':'var(--red)'}/>
         <StatCard delay={4} label="Profit Realizat" value={fmtC(agg.totalRealized)} sub={fmtPct(agg.rPct)} subClass={pnlClass(agg.totalRealized)} accent="var(--purple)"/>
         <StatCard delay={5} label="💵 Cash" value={fmtC(cashTotal)} sub={fmtPct(cashPct,false)+' din port.'} accent="var(--gold)"/>
@@ -282,4 +282,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
