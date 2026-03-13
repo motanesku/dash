@@ -378,41 +378,41 @@ export default function FoxPositions() {
       {/* Header */}
       <div style={{marginBottom:14}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:8}}>
-          <div>
-            <h2 style={{fontSize:16,fontWeight:700,color:'var(--text)',marginBottom:4}}>
-              🦊 Poziții FOX
-              <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
-            </h2>
-            <span style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
-              {openFox.length} deschise · {closedFox.length} închise
-            </span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-            <a
-              href="https://storage.rcs-rds.ro/links/e4f08490-3d2b-4f91-bc76-85f59a4e7f8c"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display:'inline-flex',alignItems:'center',gap:4,
-                fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
-                color:'var(--blue)',textDecoration:'none',
-                background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
-                borderRadius:5,padding:'3px 8px',transition:'opacity .15s',
-              }}
-              onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
-              onMouseLeave={e=>e.currentTarget.style.opacity='1'}
-            >
-              <span className="cloud-icon">☁️</span> Share Drive
-            </a>
-            {isAdmin&&<>
-            <button className="btn btn-ghost btn-sm" onClick={()=>{setEditItem(null);setShowClosedModal(true)}}>✓ Adaugă Închisă</button>
-            <button className="btn btn-primary btn-sm" onClick={()=>{setEditItem(null);setShowOpenModal(true)}}>+ Deschisă</button>
-            </>}
-          </div>
+          <h2 style={{fontSize:16,fontWeight:700,color:'var(--text)',marginBottom:4}}>
+            🦊 Poziții FOX
+            <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
+          </h2>
+          {isAdmin&&(
+            <div style={{display:'flex',gap:8}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{setEditItem(null);setShowClosedModal(true)}}>✓ Adaugă Închisă</button>
+              <button className="btn btn-primary btn-sm" onClick={()=>{setEditItem(null);setShowOpenModal(true)}}>+ Deschisă</button>
+            </div>
+          )}
+        </div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:2}}>
+          <span style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
+            {openFox.length} deschise · {closedFox.length} închise
+          </span>
+          <a
+            href="https://storage.rcs-rds.ro/links/e4f08490-3d2b-4f91-bc76-85f59a4e7f8c"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display:'inline-flex',alignItems:'center',gap:4,
+              fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
+              color:'var(--blue)',textDecoration:'none',
+              background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
+              borderRadius:5,padding:'3px 8px',transition:'opacity .15s',
+            }}
+            onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
+            onMouseLeave={e=>e.currentTarget.style.opacity='1'}
+          >
+            <span className="cloud-icon">☁️</span> Share Drive
+          </a>
         </div>
       </div>
 
-      {/* Bannere profit */}
+            {/* Bannere profit */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
         <div className="card" style={{padding:'12px 16px',borderLeft:`3px solid ${totalOpenProfit>=0?'var(--green)':'var(--red)'}`}}>
           <div className="label" style={{marginBottom:4,fontSize:9}}>PROFIT NEREALIZAT · FOX</div>
