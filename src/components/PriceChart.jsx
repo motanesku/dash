@@ -79,8 +79,9 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
             lineWidth: 1,
             lineStyle: 2, // dashed
             crosshairMarkerVisible: false,
-            lastValueVisible: false,
+            lastValueVisible: true,
             priceLineVisible: false,
+            title: '',
           })
           avgSeries.setData([
             { time: points[0].date,                 value: avgPrice },
