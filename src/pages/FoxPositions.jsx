@@ -60,10 +60,6 @@ function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
         <div style={{textAlign:'center'}}>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ MEDIU</div>
           <div style={{fontFamily:'var(--mono)',fontSize:12}}>{fmtC(f.avgPrice)}</div>
-          <div style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text)',marginTop:4,fontWeight:700}}>
-            {f.cur!=null ? fmtC(f.cur) : '—'}
-          </div>
-          {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
         </div>
         <div style={{textAlign:'right'}}>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PONDERE</div>
@@ -72,13 +68,20 @@ function MobileFoxOpenCard({ f, isAdmin, onEdit, onDelete }) {
       </div>
 
       {/* Obiectiv */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)'}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,padding:'8px 0',borderTop:'1px solid var(--border)'}}>
         <div>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>BUY MIN</div>
           <div style={{fontFamily:'var(--mono)',fontSize:12,color:'var(--gold)'}}>
             {f.inBuyZone&&<span style={{marginRight:3}}>🟢</span>}
             {f.buyMin ? `≤${f.buyMin}` : '—'}
           </div>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>PREȚ CUR</div>
+          <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'var(--text)'}}>
+            {f.cur!=null ? fmtC(f.cur) : '—'}
+          </div>
+          {f.dayChg!=null&&<div className={`mono ${pnlClass(f.dayChg)}`} style={{fontSize:10}}>{fmtPct(f.dayChg)}</div>}
         </div>
         <div style={{textAlign:'right'}}>
           <div style={{fontSize:9,color:'var(--text3)',marginBottom:2,fontWeight:600}}>SELL</div>
@@ -373,16 +376,18 @@ export default function FoxPositions() {
   return (
     <div className="fade-up">
       {/* Header */}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14,flexWrap:'wrap',gap:10}}>
-        <div>
-          <h2 style={{fontSize:16,fontWeight:700,color:'var(--text)',marginBottom:4}}>
-            🦊 Poziții FOX
-            <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
-          </h2>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',width:'100%'}}>
+      <div style={{marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexWrap:'wrap',gap:8}}>
+          <div>
+            <h2 style={{fontSize:16,fontWeight:700,color:'var(--text)',marginBottom:4}}>
+              🦊 Poziții FOX
+              <span style={{fontSize:11,fontWeight:400,color:'var(--text3)',marginLeft:8}}>watchlist independent · cloud sync</span>
+            </h2>
             <span style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
               {openFox.length} deschise · {closedFox.length} închise
             </span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
             <a
               href="https://storage.rcs-rds.ro/links/e4f08490-3d2b-4f91-bc76-85f59a4e7f8c"
               target="_blank"
@@ -392,22 +397,19 @@ export default function FoxPositions() {
                 fontSize:10,fontFamily:'var(--mono)',fontWeight:600,
                 color:'var(--blue)',textDecoration:'none',
                 background:'var(--blue-bg)',border:'1px solid var(--blue-b)',
-                borderRadius:5,padding:'3px 8px',
-                transition:'opacity .15s',
+                borderRadius:5,padding:'3px 8px',transition:'opacity .15s',
               }}
               onMouseEnter={e=>e.currentTarget.style.opacity='.7'}
               onMouseLeave={e=>e.currentTarget.style.opacity='1'}
             >
               <span className="cloud-icon">☁️</span> Share Drive
             </a>
-          </div>
-        </div>
-        {isAdmin&&(
-          <div style={{display:'flex',gap:8}}>
+            {isAdmin&&<>
             <button className="btn btn-ghost btn-sm" onClick={()=>{setEditItem(null);setShowClosedModal(true)}}>✓ Adaugă Închisă</button>
             <button className="btn btn-primary btn-sm" onClick={()=>{setEditItem(null);setShowOpenModal(true)}}>+ Deschisă</button>
+            </>}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Bannere profit */}
