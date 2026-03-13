@@ -200,6 +200,43 @@ export default function Club() {
         </div>
       </div>
 
+      {/* Total card — sub valoare actuală */}
+      {club.investors.length > 0 && (
+        <div style={{
+          background:'var(--surface)',border:'1px solid var(--border)',
+          borderRadius:14,padding:'16px',marginBottom:20,
+          borderTop:'3px solid var(--text3)',
+        }}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+            <div style={{
+              width:40,height:40,borderRadius:'50%',background:'var(--surface2)',
+              border:'2px solid var(--border)',display:'flex',alignItems:'center',
+              justifyContent:'center',fontSize:18,flexShrink:0,
+            }}>👥</div>
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:15,color:'var(--text)',marginBottom:4}}>Total {stats.length} investitori</div>
+              <div style={{height:6,borderRadius:3,background:'var(--blue)',width:'100%'}}/>
+            </div>
+            <span style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--text3)',fontSize:12}}>100%</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+            <div style={{background:'var(--surface2)',borderRadius:8,padding:'10px 8px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:4,letterSpacing:.4}}>INVESTIT</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'var(--text)'}}>{fmtRON(totalInvested)}</div>
+            </div>
+            <div style={{background:'var(--surface2)',borderRadius:8,padding:'10px 8px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:4,letterSpacing:.4}}>VALOARE</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'var(--blue)'}}>{fmtRON(displayValue)}</div>
+            </div>
+            <div style={{background:'var(--surface2)',borderRadius:8,padding:'10px 8px',textAlign:'center'}}>
+              <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:4,letterSpacing:.4}}>PROFIT</div>
+              <div className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontSize:12,fontWeight:700}}>{fmtRON(displayValue-totalInvested)}</div>
+              <div className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontSize:10,marginTop:2}}>{totalInvested>0?fmtPct((displayValue-totalInvested)/totalInvested*100):'—'}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {club.investors.length === 0 ? (
         <div className="card" style={{padding:'60px 20px',textAlign:'center'}}>
           <div style={{fontSize:40,marginBottom:12}}>🤝</div>
@@ -226,28 +263,7 @@ export default function Club() {
             ))}
           </div>
 
-          {/* Total bar */}
-          <div style={{
-            background:'var(--surface)',border:'1px solid var(--border)',
-            borderRadius:10,padding:'12px 16px',marginBottom:20,
-            display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,
-          }}>
-            <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--text3)',fontWeight:700}}>TOTAL {stats.length} INVESTITORI</span>
-            <div style={{display:'flex',gap:20}}>
-              <div style={{textAlign:'center'}}>
-                <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:2}}>INVESTIT</div>
-                <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13}}>{fmtRON(totalInvested)}</div>
-              </div>
-              <div style={{textAlign:'center',marginLeft:20}}>
-                <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:2}}>VALOARE</div>
-                <div style={{fontFamily:'var(--mono)',fontWeight:700,fontSize:13,color:'var(--blue)'}}>{fmtRON(displayValue)}</div>
-              </div>
-              <div style={{textAlign:'center',marginLeft:20}}>
-                <div style={{fontSize:9,color:'var(--text3)',fontWeight:600,marginBottom:2}}>PROFIT</div>
-                <div className={`mono ${pnlClass(displayValue-totalInvested)}`} style={{fontWeight:700,fontSize:13}}>{fmtRON(displayValue-totalInvested)}</div>
-              </div>
-            </div>
-          </div>
+
 
           {/* Contribuții lunare */}
           {months.length > 0 && (
