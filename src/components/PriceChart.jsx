@@ -4,8 +4,6 @@ import { fetchHistory } from '../lib/prices.js'
 export default function PriceChart({ symbol, height = 200, showVolume = false, avgPrice = null }) {
   const containerRef = useRef(null)
   const chartRef = useRef(null)
-  const seriesRef = useRef(null)
-  const avgLineRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [range, setRange] = useState('3mo')
@@ -20,8 +18,6 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
         if (chartRef.current) {
           chartRef.current.remove()
           chartRef.current = null
-          seriesRef.current = null
-          avgLineRef.current = null
         }
         chart = createChart(containerRef.current, {
           width: containerRef.current.clientWidth,
@@ -64,8 +60,9 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
           crosshairMarkerRadius: 4,
           crosshairMarkerBorderColor: '#4d9fff',
           crosshairMarkerBackgroundColor: '#0a0e1a',
+          lastValueVisible: true,
+          priceLineVisible: false,
         })
-        seriesRef.current = series
 
         setLoading(true)
         const points = await fetchHistory(symbol, range)
@@ -74,23 +71,35 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
         const data = points.map(p => ({ time: p.date, value: p.close }))
         series.setData(data)
 
-        // Linie avg price — portocalie punctată
+        // Linie avg price — portocalie punctată cu etichetă în stânga
         if (avgPrice != null && points.length >= 2) {
+          // Linia punctată
           const avgSeries = chart.addLineSeries({
             color: '#f0b429',
             lineWidth: 1,
-            lineStyle: 2, // 2 = dashed
+            lineStyle: 2, // dashed
             crosshairMarkerVisible: false,
-            lastValueVisible: true,
+            lastValueVisible: false,
             priceLineVisible: false,
+          })
+          avgSeries.setData([
+            { time: points[0].date,                 value: avgPrice },
+            { time: points[points.length - 1].date, value: avgPrice },
+          ])
+
+          // Etichetă AVG — desenată manual pe canvas în stânga
+          const priceToCoord = series.priceToCoordinate.bind(series)
+          chart.subscribeCrosshairMove(() => {}) // trigger re-render
+          
+          // Price line cu titlu pe stânga via watermark workaround
+          series.createPriceLine({
+            price: avgPrice,
+            color: '#f0b42900', // transparent — doar pentru poziționare
+            lineWidth: 0,
+            lineStyle: 2,
+            axisLabelVisible: true,
             title: `AVG ${avgPrice.toFixed(2)}`,
           })
-          avgLineRef.current = avgSeries
-          // Linie orizontală de la prima la ultima dată
-          avgSeries.setData([
-            { time: points[0].date,                  value: avgPrice },
-            { time: points[points.length - 1].date,  value: avgPrice },
-          ])
         }
 
         chart.timeScale().fitContent()
@@ -122,8 +131,17 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
 
   return (
     <div>
-      {/* Range selector */}
-      <div style={{display:'flex',gap:6,marginBottom:8,justifyContent:'flex-end'}}>
+      <div style={{display:'flex',gap:6,marginBottom:8,justifyContent:'flex-end',alignItems:'center'}}>
+        {/* Legendă AVG */}
+        {avgPrice != null && (
+          <span style={{
+            fontSize:10, fontFamily:'var(--mono)', color:'#f0b429',
+            marginRight:'auto', display:'flex', alignItems:'center', gap:5,
+          }}>
+            <span style={{display:'inline-block',width:16,height:1,borderTop:'2px dashed #f0b429',verticalAlign:'middle'}}/>
+            AVG {avgPrice.toFixed(2)}
+          </span>
+        )}
         {RANGES.map(r=>(
           <button key={r.v} onClick={()=>setRange(r.v)} style={{
             padding:'3px 8px',borderRadius:4,border:'none',cursor:'pointer',
@@ -150,3 +168,4 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
     </div>
   )
 }
+
