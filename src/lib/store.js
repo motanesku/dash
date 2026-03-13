@@ -147,6 +147,8 @@ const useStore = create((set, get) => ({
       portfolioSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       foxSyms.forEach(s => { if (allPrices[s]) prices[s] = allPrices[s]; });
       marketSyms.forEach(s => { if (allPrices[s]) marketData[s] = allPrices[s]; });
+      // RON=X disponibil și în prices pentru Club (care nu are acces la marketData în timp util)
+      if (allPrices['RON=X']) prices['RON=X'] = allPrices['RON=X'];
       // Păstrează VIX din feargreed dacă /api/prices nu l-a returnat
       const existingVix = get().marketData['^VIX'];
       if (!marketData['^VIX'] && existingVix?.price != null) {
@@ -378,4 +380,5 @@ const useStore = create((set, get) => ({
 }));
 
 export default useStore;
+
 
