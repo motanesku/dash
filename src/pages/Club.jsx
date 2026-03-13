@@ -34,28 +34,14 @@ export default function Club() {
   const [editContrib, setEditContrib] = useState(null)
   const [invForm,    setInvForm]    = useState({name:'', color:CLUB_COLORS[0]})
   const [contribForm, setContribForm] = useState({investorId:'', month:new Date().toISOString().slice(0,7), amount:''})
-  const [clubValOverride, setClubValOverride] = useState('')
 
-  // Citim cursul RON din toate sursele posibile
-  const usdRon = marketData['RON=X']?.price 
-    || prices['RON=X']?.price
-    || (() => {
-        try {
-          // Fallback: citim direct din cache-ul de market din localStorage
-          const cached = localStorage.getItem('ptf_v6_market')
-          if (cached) {
-            const m = JSON.parse(cached)
-            return m['RON=X']?.price || null
-          }
-        } catch {}
-        return null
-      })()
+  const usdRon = marketData['RON=X']?.price || prices['RON=X']?.price || (() => {
+    try { const m = JSON.parse(localStorage.getItem('ptf_v6_market')||'{}'); return m['RON=X']?.price||null } catch { return null }
+  })()
   const totalStocks = positions.reduce((s,p)=>s+(p.curValue||0),0)
   const totalCash = Object.values(cashByBroker).reduce((s,v)=>s+v,0)
   const totalPortfolio = totalStocks + totalCash
-  const autoValueRON = usdRon ? totalPortfolio * usdRon : null
-  // Folosim mereu valoarea auto (live) — override manual doar dacă admin setează explicit
-  const displayValue = club.totalValue > 0 ? club.totalValue : (autoValueRON || 0)
+  const displayValue = usdRon ? totalPortfolio * usdRon : 0
 
   const stats = useMemo(() => {
     const total = club.investors.reduce((s,inv) =>
@@ -134,19 +120,12 @@ export default function Club() {
             </div>}
           </div>
           <div style={{display:'flex',flexDirection:'column',gap:8,alignItems:'flex-end'}}>
-            {usdRon&&<div style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)',background:'var(--surface2)',padding:'4px 10px',borderRadius:5,border:'1px solid var(--border)'}}>
-              {Math.round(totalStocks)} stocuri + {Math.round(totalCash)} cash = {Math.round(totalPortfolio)} USD × {usdRon?.toFixed(2)} RON
-            </div>}
-            {!usdRon&&<div style={{fontSize:11,color:'var(--gold)',fontFamily:'var(--mono)',background:'var(--gold-bg)',padding:'4px 10px',borderRadius:5,border:'1px solid rgba(240,180,41,0.25)'}}>
-              ⏳ se încarcă cursul USD/RON...
-            </div>}
-            {isAdmin&&<div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <input className="input mono" type="number" placeholder="Override RON..." value={clubValOverride}
-                onChange={e=>setClubValOverride(e.target.value)} style={{width:160,fontSize:12}}
-                onKeyDown={e=>e.key==='Enter'&&(updateClub({...club,totalValue:+clubValOverride}),setClubValOverride(''))}/>
-              <button className="btn btn-primary btn-sm" onClick={()=>{updateClub({...club,totalValue:+clubValOverride});setClubValOverride('')}}>Set</button>
-              {club.totalValue>0&&<button className="btn btn-ghost btn-sm" onClick={()=>updateClub({...club,totalValue:0})}>Auto</button>}
-            </div>}
+            {usdRon
+              ? <div style={{fontSize:11,color:'var(--text3)',fontFamily:'var(--mono)'}}>
+                  {Math.round(totalStocks)} stocuri + {Math.round(totalCash)} cash = {Math.round(totalPortfolio)} USD × {usdRon.toFixed(2)}
+                </div>
+              : <div style={{fontSize:11,color:'var(--gold)',fontFamily:'var(--mono)'}}>⏳ se încarcă cursul USD/RON...</div>
+            }
           </div>
         </div>
       </div>
@@ -327,3 +306,4 @@ export default function Club() {
     </div>
   )
 }
+
