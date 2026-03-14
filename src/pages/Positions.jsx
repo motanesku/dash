@@ -154,14 +154,28 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
 
         {/* Actions */}
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>{if(selected){onSelect(null)}else{onSelect(p);setShowAnalysis(false)}}} style={{
+          <button onClick={()=>{
+            if (selected) {
+              onSelect(null)
+            } else {
+              onSelect(p)
+              setShowAnalysis(false) // închide analiza
+            }
+          }} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:selected?'var(--blue-bg)':'var(--surface2)',
             color:selected?'var(--blue)':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
           }}>
             {selected ? '▲ Chart' : '📈 Chart'}
           </button>
-          <button onClick={()=>{if(showAnalysis){setShowAnalysis(false)}else{setShowAnalysis(true);onSelect(null)}}} style={{
+          <button onClick={()=>{
+            if (showAnalysis) {
+              setShowAnalysis(false)
+            } else {
+              setShowAnalysis(true)
+              onSelect(null) // închide chart-ul
+            }
+          }} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:showAnalysis?'rgba(167,139,250,0.15)':'var(--surface2)',
             color:showAnalysis?'#a78bfa':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
@@ -527,7 +541,7 @@ export default function Positions({ onEditTx }) {
                 brokers={brokers}
                 isAdmin={isAdmin}
                 onEditInfo={sym=>setEditInfoSym(sym)}
-                onSelect={pos=>setSelectedPos(selectedPos?.symbol===pos.symbol?null:pos)}
+                onSelect={pos=>setSelectedPos(pos)}
                 selected={selectedPos?.symbol===p.symbol}
                 onAlert={sym=>setAlertSym(sym)}
                 alerts={alerts}
@@ -849,5 +863,6 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
+
 
 
