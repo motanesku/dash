@@ -17,12 +17,20 @@ function writeBetaCache(data) {
   try { localStorage.setItem(BETA_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
-// Calculează beta dintre un simbol și S&P 500
-// returns: { beta, label, emoji }
-export function calcBeta(symReturns, spReturns) {
+// Transformă istoric în returnuri zilnice
+function toReturns(points) {
+  if (!points?.length) return [];
+  return points.slice(1).map((p, i) => ({
+    date: p.date,
+    ret: points[i].close > 0 ? (p.close - points[i].close) / points[i].close : 0,
+  }));
+}
+
+// Calculează beta și alpha dintr-o regresie liniară
+// Returnuri_simbol = alpha + beta × Returnuri_SP500
+export function calcBetaAlpha(symReturns, spReturns) {
   if (!symReturns?.length || !spReturns?.length) return null;
 
-  // Aliniază datele după dată
   const spMap = {};
   spReturns.forEach(p => { spMap[p.date] = p.ret; });
 
@@ -34,26 +42,25 @@ export function calcBeta(symReturns, spReturns) {
 
   const n = pairs.length;
   const meanSym = pairs.reduce((s, p) => s + p.sym, 0) / n;
-  const meanSp  = pairs.reduce((s, p) => s + p.sp, 0) / n;
+  const meanSp  = pairs.reduce((s, p) => s + p.sp,  0) / n;
 
   let cov = 0, varSp = 0;
   pairs.forEach(p => {
     cov   += (p.sym - meanSym) * (p.sp - meanSp);
-    varSp += (p.sp - meanSp) ** 2;
+    varSp += (p.sp  - meanSp) ** 2;
   });
 
   if (varSp === 0) return null;
-  const beta = cov / varSp;
-  return beta;
-}
 
-// Transformă istoric în returnuri zilnice
-function toReturns(points) {
-  if (!points?.length) return [];
-  return points.slice(1).map((p, i) => ({
-    date: p.date,
-    ret: points[i].close > 0 ? (p.close - points[i].close) / points[i].close : 0,
-  }));
+  const beta  = cov / varSp;
+  const alpha = meanSym - beta * meanSp; // intersecția — return zilnic mediu ajustat
+  // Anualizăm alpha: ~252 zile trading/an
+  const alphaAnnualized = alpha * 252;
+
+  return {
+    beta:  parseFloat(beta.toFixed(2)),
+    alpha: parseFloat((alphaAnnualized * 100).toFixed(2)), // în procente anuale
+  };
 }
 
 // Etichetă beta
@@ -67,47 +74,68 @@ export function betaLabel(beta) {
   return             { text: 'Foarte volatil', emoji: '🔥', color: 'var(--red)' };
 }
 
-// Fetch și calculează beta pentru o listă de simboluri
+// Etichetă alpha
+export function alphaLabel(alpha) {
+  if (alpha == null) return null;
+  if (alpha >  15) return { text: 'Alpha ridicat',  color: '#4d9fff' };
+  if (alpha >   5) return { text: 'Alpha pozitiv',  color: '#60a5fa' };
+  if (alpha >  -5) return { text: 'Neutru',          color: 'var(--text3)' };
+  if (alpha > -15) return { text: 'Alpha negativ',  color: '#a78bfa' };
+  return             { text: 'Alpha slab',           color: '#c084fc' };
+}
+
+// Fetch beta + alpha pentru 3L și 1A
 export async function fetchBetas(symbols) {
   const cached = readBetaCache();
   if (cached) {
-    const missing = symbols.filter(s => cached[s] == null);
+    const missing = symbols.filter(s =>
+      cached[s]?.beta3m == null || cached[s]?.beta1y == null
+    );
     if (!missing.length) return cached;
   }
 
   try {
-    const [spHistory, symHistories] = await Promise.all([
+    const [sp3m, sp1y, sym3m, sym1y] = await Promise.all([
       fetchHistory('^GSPC', '3mo'),
+      fetchHistory('^GSPC', '1y'),
       fetchHistoryMulti(symbols, '3mo'),
+      fetchHistoryMulti(symbols, '1y'),
     ]);
 
-    const spReturns = toReturns(spHistory);
-    const betas = { ...(cached || {}) };
+    const spRet3m = toReturns(sp3m);
+    const spRet1y = toReturns(sp1y);
+    const result  = { ...(cached || {}) };
 
     symbols.forEach(sym => {
-      const hist = symHistories[sym];
-      if (!hist?.length) return;
-      const symReturns = toReturns(hist);
-      const b = calcBeta(symReturns, spReturns);
-      if (b != null) betas[sym] = parseFloat(b.toFixed(2));
+      const r3m = toReturns(sym3m[sym]);
+      const r1y = toReturns(sym1y[sym]);
+      const calc3m = calcBetaAlpha(r3m, spRet3m);
+      const calc1y = calcBetaAlpha(r1y, spRet1y);
+      result[sym] = {
+        beta3m:  calc3m?.beta  ?? null,
+        alpha3m: calc3m?.alpha ?? null,
+        beta1y:  calc1y?.beta  ?? null,
+        alpha1y: calc1y?.alpha ?? null,
+      };
     });
 
-    writeBetaCache(betas);
-    return betas;
+    writeBetaCache(result);
+    return result;
   } catch (e) {
     console.warn('fetchBetas failed:', e.message);
     return cached || {};
   }
 }
 
-// Beta portofoliu ponderat după valoare
+// Beta portofoliu ponderat după valoare (folosește beta 1y)
 export function calcPortfolioBeta(positions, betas) {
   const total = positions.reduce((s, p) => s + (p.curValue || 0), 0);
   if (!total) return null;
   let weighted = 0;
   positions.forEach(p => {
-    const b = betas[p.symbol];
+    const b = betas[p.symbol]?.beta1y ?? betas[p.symbol]?.beta3m ?? null;
     if (b != null) weighted += b * ((p.curValue || 0) / total);
   });
   return parseFloat(weighted.toFixed(2));
 }
+
