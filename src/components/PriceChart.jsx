@@ -62,7 +62,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
           crosshairMarkerBorderColor: '#4d9fff',
           crosshairMarkerBackgroundColor: '#0a0e1a',
           lastValueVisible: true,
-          priceLineVisible: true,
+          priceLineVisible: false,
         })
 
         setLoading(true)
