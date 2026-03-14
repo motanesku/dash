@@ -53,9 +53,10 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
 
         const series = chart.addAreaSeries({
           lineColor: '#4d9fff',
-          topColor: 'rgba(77,159,255,0.2)',
+          topColor: 'rgba(77,159,255,0.15)',
           bottomColor: 'rgba(77,159,255,0.0)',
-          lineWidth: 2,
+          lineWidth: 1,
+          lineStyle: 2,
           crosshairMarkerVisible: true,
           crosshairMarkerRadius: 4,
           crosshairMarkerBorderColor: '#4d9fff',
@@ -157,4 +158,5 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
     </div>
   )
 }
+
 
