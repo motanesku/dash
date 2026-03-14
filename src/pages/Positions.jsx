@@ -7,7 +7,9 @@ import { CompanyInfoCard, SECTOR_ICONS, CAP_COLORS as CAP_COLORS_NEW, CAPS, SECT
 import Sparkline from '../components/Sparkline.jsx'
 import AlertModal from '../components/AlertModal.jsx'
 import { loadAlerts } from '../lib/alerts.js'
-import { fetchBetas, betaLabel, calcPortfolioBeta } from '../lib/beta.js'
+import { fetchBetas, betaLabel, alphaLabel, calcPortfolioBeta } from '../lib/beta.js'
+import AnalysisCard from '../components/AnalysisCard.jsx'
+import React from 'react'
 
 const BROKER_COLORS = ['#58a6ff','#f0b429','#00d4aa','#a78bfa','#ff5572','#fb923c']
 const CAP_COLORS    = { 'Large Cap':'var(--blue)', 'Mid Cap':'var(--green)', 'Small Cap':'var(--gold)', 'Micro Cap':'var(--red)' }
@@ -61,6 +63,7 @@ function aggregateBySymbol(positions) {
 
 // ── Mobile Position Card ─────────────────────────────────────
 function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts, betas, betaTooltip, setBetaTooltip }) {
+  const [showAnalysis, setShowAnalysis] = React.useState(false)
   const info = companyInfo[p.symbol] || {}
   const brokerList = p.brokers || [p.broker]
   const unrColor = (p.unrealizedPnl||0) >= 0 ? 'var(--green)' : 'var(--red)'
@@ -114,41 +117,7 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
             <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:600,color:unrColor}}>
               {p.unrealizedPct!=null ? fmtPct(p.unrealizedPct) : ''}
             </div>
-            {/* Beta */}
-            {(() => {
-              const b = betas?.[p.symbol]
-              if (b == null) return null
-              const lbl = betaLabel(b)
-              const isOpen = betaTooltip === p.symbol
-              return (
-                <div style={{position:'relative',marginTop:4}}>
-                  <div
-                    onClick={e=>{e.stopPropagation();setBetaTooltip(isOpen?null:p.symbol)}}
-                    style={{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:3,
-                      fontFamily:'var(--mono)',fontSize:10,color:lbl.color,fontWeight:600}}
-                  >
-                    β {b.toFixed(2)} {lbl.emoji}
-                  </div>
-                  {isOpen && (
-                    <div style={{
-                      position:'absolute',right:0,top:'100%',zIndex:10,marginTop:4,
-                      background:'var(--surface)',border:'1px solid var(--border2)',
-                      borderRadius:8,padding:'8px 12px',minWidth:200,
-                      boxShadow:'var(--shadow)',fontSize:11,color:'var(--text2)',
-                      fontFamily:'var(--mono)',lineHeight:1.5,
-                    }}>
-                      <div style={{fontWeight:700,color:lbl.color,marginBottom:4}}>{lbl.emoji} {lbl.text}</div>
-                      <div>β {b.toFixed(2)} față de S&P 500</div>
-                      <div style={{color:'var(--text3)',marginTop:3,fontSize:10}}>
-                        {b > 0
-                          ? `La o mișcare de 10% a pieței, această poziție se mișcă ~${Math.abs(b*10).toFixed(1)}%`
-                          : 'Se mișcă invers față de piață'}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
+
           </div>
         </div>
 
@@ -191,7 +160,14 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
             background:selected?'var(--blue-bg)':'var(--surface2)',
             color:selected?'var(--blue)':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
           }}>
-            {selected ? '▲ Ascunde chart' : '📈 Chart'}
+            {selected ? '▲ Chart' : '📈 Chart'}
+          </button>
+          <button onClick={()=>setShowAnalysis(v=>!v)} style={{
+            flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
+            background:showAnalysis?'rgba(167,139,250,0.15)':'var(--surface2)',
+            color:showAnalysis?'#a78bfa':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
+          }}>
+            {showAnalysis ? '▲ Analiză' : '🧠 Analiză'}
           </button>
           {isAdmin && (
             <button onClick={()=>onEditInfo(p.symbol)} style={{
@@ -210,6 +186,11 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
         }}>
           {children}
         </div>
+      )}
+
+      {/* Card Analiză */}
+      {showAnalysis && (
+        <AnalysisCard p={p} betas={betas}/>
       )}
     </div>
   )
@@ -866,4 +847,5 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
+
 
