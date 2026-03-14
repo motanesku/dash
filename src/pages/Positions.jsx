@@ -62,8 +62,7 @@ function aggregateBySymbol(positions) {
 }
 
 // ── Mobile Position Card ─────────────────────────────────────
-function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts, betas, betaTooltip, setBetaTooltip }) {
-  const [showAnalysis, setShowAnalysis] = React.useState(false)
+function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSelect, selected, children, onAlert, alerts, betas, betaTooltip, setBetaTooltip, showAnalysis, setShowAnalysis }) {
   const info = companyInfo[p.symbol] || {}
   const brokerList = p.brokers || [p.broker]
   const unrColor = (p.unrealizedPnl||0) >= 0 ? 'var(--green)' : 'var(--red)'
@@ -155,14 +154,14 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
 
         {/* Actions */}
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>onSelect(p)} style={{
+          <button onClick={()=>{onSelect(p);setShowAnalysis(false)}} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:selected?'var(--blue-bg)':'var(--surface2)',
             color:selected?'var(--blue)':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
           }}>
             {selected ? '▲ Chart' : '📈 Chart'}
           </button>
-          <button onClick={()=>setShowAnalysis(v=>!v)} style={{
+          <button onClick={()=>{setShowAnalysis(v=>!v);if(!showAnalysis)onSelect(null)}} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:showAnalysis?'rgba(167,139,250,0.15)':'var(--surface2)',
             color:showAnalysis?'#a78bfa':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
@@ -290,6 +289,7 @@ export default function Positions({ onEditTx }) {
   const [sortBy, setSortBy]           = useState('value')
   const [betas, setBetas]             = useState({})
   const [betaTooltip, setBetaTooltip] = useState(null)
+  const [analysisOpen, setAnalysisOpen] = useState(null) // symbol string
 
   // Fetch beta pentru toate simbolurile deschise
   useEffect(() => {
@@ -534,6 +534,8 @@ export default function Positions({ onEditTx }) {
                 betas={betas}
                 betaTooltip={betaTooltip}
                 setBetaTooltip={setBetaTooltip}
+                showAnalysis={analysisOpen === p.symbol}
+                setShowAnalysis={(v) => setAnalysisOpen(v ? p.symbol : null)}
               >
                 <PriceChart symbol={p.symbol} height={200} avgPrice={p.avgPrice ?? null}/>
               </MobilePositionCard>
