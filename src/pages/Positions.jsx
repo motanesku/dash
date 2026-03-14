@@ -154,14 +154,14 @@ function MobilePositionCard({ p, companyInfo, brokers, isAdmin, onEditInfo, onSe
 
         {/* Actions */}
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>{const isOpen=selected;onSelect(isOpen?null:p);if(!isOpen)setShowAnalysis(false)}} style={{
+          <button onClick={()=>{if(selected){onSelect(null)}else{onSelect(p);setShowAnalysis(false)}}} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:selected?'var(--blue-bg)':'var(--surface2)',
             color:selected?'var(--blue)':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
           }}>
             {selected ? '▲ Chart' : '📈 Chart'}
           </button>
-          <button onClick={()=>{const opening=!showAnalysis;setShowAnalysis(opening);if(opening)onSelect(null)}} style={{
+          <button onClick={()=>{if(showAnalysis){setShowAnalysis(false)}else{setShowAnalysis(true);onSelect(null)}}} style={{
             flex:1,padding:'6px',borderRadius:6,border:'1px solid var(--border)',
             background:showAnalysis?'rgba(167,139,250,0.15)':'var(--surface2)',
             color:showAnalysis?'#a78bfa':'var(--text3)',cursor:'pointer',fontSize:11,fontWeight:600,
