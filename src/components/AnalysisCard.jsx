@@ -7,9 +7,7 @@ import { betaLabel, alphaLabel } from '../lib/beta.js'
 function calcRSI(points, period = 14) {
   if (!points || points.length < period + 1) return null
   const changes = []
-  for (let i = 1; i < points.length; i++) {
-    changes.push(points[i].close - points[i-1].close)
-  }
+  for (let i = 1; i < points.length; i++) changes.push(points[i].close - points[i-1].close)
   const recent = changes.slice(-period * 3)
   let gains = 0, losses = 0
   recent.slice(0, period).forEach(c => { if (c > 0) gains += c; else losses -= c })
@@ -24,10 +22,15 @@ function calcRSI(points, period = 14) {
   return parseFloat((100 - 100 / (1 + avgGain / avgLoss)).toFixed(1))
 }
 
-function calcSMA(points, period) {
+// EMA — pune mai mult accent pe prețurile recente vs SMA
+function calcEMA(points, period) {
   if (!points || points.length < period) return null
-  const slice = points.slice(-period)
-  return slice.reduce((s, p) => s + p.close, 0) / period
+  const k = 2 / (period + 1)
+  let ema = points.slice(0, period).reduce((s, p) => s + p.close, 0) / period
+  for (let i = period; i < points.length; i++) {
+    ema = points[i].close * k + ema * (1 - k)
+  }
+  return parseFloat(ema.toFixed(2))
 }
 
 function calcHV(points, period = 20) {
@@ -38,18 +41,15 @@ function calcHV(points, period = 20) {
   }
   const mean = rets.reduce((s, r) => s + r, 0) / rets.length
   const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length
-  return parseFloat((Math.sqrt(variance * 252) * 100).toFixed(1)) // anualizat %
+  return parseFloat((Math.sqrt(variance * 252) * 100).toFixed(1))
 }
 
 // ── Generează concluzie și semnal ───────────────────────────
 
-function generateAnalysis({ beta3m, beta1y, alpha3m, alpha1y, rsi, hv, sma50, sma200, curPrice, avgPrice }) {
+function generateAnalysis({ beta3m, beta1y, alpha3m, alpha1y, rsi, hv, ema50, ema200, curPrice, avgPrice }) {
   const lines = []
-  let signal = 'NEUTRU'
-  let signalColor = 'var(--text3)'
   let bullScore = 0, bearScore = 0
 
-  // Beta trend
   if (beta3m != null && beta1y != null) {
     if (beta3m > beta1y + 0.3) {
       lines.push(`Volatilitate în creștere recent (β3L ${beta3m} > β1A ${beta1y}) — acțiunea amplifică mai puternic mișcările pieței față de istoric.`)
@@ -62,111 +62,113 @@ function generateAnalysis({ beta3m, beta1y, alpha3m, alpha1y, rsi, hv, sma50, sm
     }
   }
 
-  // Alpha
   if (alpha3m != null && alpha1y != null) {
     if (alpha3m > 5 && alpha1y > 5) {
-      lines.push(`Alpha pozitiv pe ambele perioade (α3L +${alpha3m.toFixed(1)}%, α1A +${alpha1y.toFixed(1)}%) — acțiunea generează randament propriu consistent, independent de piață.`)
+      lines.push(`Alpha pozitiv pe ambele perioade (α3L +${alpha3m.toFixed(1)}%, α1A +${alpha1y.toFixed(1)}%) — acțiunea generează randament propriu consistent.`)
       bullScore += 2
     } else if (alpha3m > 10 && alpha1y < 0) {
-      lines.push(`Alpha recent puternic (α3L +${alpha3m.toFixed(1)}%) dar slab pe 1 an (α1A ${alpha1y.toFixed(1)}%) — momentum recent pozitiv pe un fond istoric mai slab.`)
+      lines.push(`Momentum recent pozitiv (α3L +${alpha3m.toFixed(1)}%) pe un fond de 1 an slab (α1A ${alpha1y.toFixed(1)}%) — perioadă de revenire posibilă.`)
       bullScore++
     } else if (alpha3m < -5 && alpha1y > 5) {
-      lines.push(`Perioadă recentă slabă (α3L ${alpha3m.toFixed(1)}%) față de un istoric bun (α1A +${alpha1y.toFixed(1)}%) — posibil pullback temporar.`)
+      lines.push(`Pullback recent (α3L ${alpha3m.toFixed(1)}%) față de un fond bun pe 1 an (α1A +${alpha1y.toFixed(1)}%) — posibilă oportunitate.`)
       bullScore++
     } else if (alpha3m < 0 && alpha1y < 0) {
-      lines.push(`Alpha negativ pe ambele perioade (α3L ${alpha3m.toFixed(1)}%, α1A ${alpha1y.toFixed(1)}%) — acțiunea subperformează piața consistent.`)
+      lines.push(`Alpha negativ pe ambele perioade (α3L ${alpha3m.toFixed(1)}%, α1A ${alpha1y.toFixed(1)}%) — subperformanță față de piață.`)
       bearScore += 2
     }
   }
 
-  // RSI
   if (rsi != null) {
-    if (rsi > 70) {
-      lines.push(`RSI ${rsi} — zonă de supracumpărare. Risc de corecție pe termen scurt.`)
-      bearScore++
-    } else if (rsi < 30) {
-      lines.push(`RSI ${rsi} — zonă de supravânzare. Potențial punct de intrare.`)
-      bullScore++
-    } else if (rsi >= 50 && rsi <= 65) {
-      lines.push(`RSI ${rsi} — momentum pozitiv, fără supraîncălzire.`)
-      bullScore++
-    } else {
-      lines.push(`RSI ${rsi} — zonă neutră.`)
-    }
+    if (rsi > 70) { lines.push(`RSI ${rsi} — supracumpărat. Risc de corecție pe termen scurt.`); bearScore++ }
+    else if (rsi < 30) { lines.push(`RSI ${rsi} — supravândut. Potențial punct de intrare.`); bullScore++ }
+    else if (rsi >= 50 && rsi <= 65) { lines.push(`RSI ${rsi} — momentum pozitiv, fără supraîncălzire.`); bullScore++ }
+    else { lines.push(`RSI ${rsi} — zonă neutră.`) }
   }
 
-  // SMA
-  if (sma50 != null && curPrice != null) {
-    const distSMA50 = ((curPrice - sma50) / sma50 * 100).toFixed(1)
-    if (curPrice > sma50) {
-      lines.push(`Prețul e cu ${distSMA50}% peste SMA50 — trend pe termen mediu bullish.`)
-      bullScore++
-    } else {
-      lines.push(`Prețul e cu ${Math.abs(distSMA50)}% sub SMA50 — trend pe termen mediu bearish.`)
-      bearScore++
-    }
+  if (ema50 != null && curPrice != null) {
+    const d = ((curPrice - ema50) / ema50 * 100)
+    if (curPrice > ema50) { lines.push(`Prețul e cu ${d.toFixed(1)}% peste EMA50 — trend pe termen mediu bullish.`); bullScore++ }
+    else { lines.push(`Prețul e cu ${Math.abs(d).toFixed(1)}% sub EMA50 — trend pe termen mediu bearish.`); bearScore++ }
   }
 
-  // Semnal final
-  if (bullScore >= 3) { signal = 'BULLISH'; signalColor = '#00d4aa' }
-  else if (bearScore >= 3) { signal = 'BEARISH'; signalColor = '#ff5572' }
-  else if (bullScore > bearScore) { signal = 'MODERAT BULLISH'; signalColor = '#4d9fff' }
-  else if (bearScore > bullScore) { signal = 'MODERAT BEARISH'; signalColor = '#f0b429' }
+  if (ema200 != null && curPrice != null) {
+    const d = ((curPrice - ema200) / ema200 * 100)
+    if (curPrice > ema200) { lines.push(`Prețul e cu ${d.toFixed(1)}% peste EMA200 — trend pe termen lung bullish.`); bullScore++ }
+    else { lines.push(`Prețul e cu ${Math.abs(d).toFixed(1)}% sub EMA200 — trend pe termen lung bearish.`); bearScore++ }
+  }
+
+  let signal = 'NEUTRU', signalColor = 'var(--text3)'
+  if (bullScore >= 4) { signal = 'BULLISH'; signalColor = '#00d4aa' }
+  else if (bearScore >= 4) { signal = 'BEARISH'; signalColor = '#ff5572' }
+  else if (bullScore > bearScore + 1) { signal = 'MODERAT BULLISH'; signalColor = '#4d9fff' }
+  else if (bearScore > bullScore + 1) { signal = 'MODERAT BEARISH'; signalColor = '#f0b429' }
 
   return { lines, signal, signalColor, bullScore, bearScore }
 }
 
-function calcTPSL(avgPrice, hv, beta3m, alpha3m, rsi, sma50, curPrice) {
+function calcTPSL(avgPrice, hv, beta3m, alpha3m, rsi, ema50, curPrice) {
   if (!avgPrice || !hv) return null
-
-  const hvDaily = hv / Math.sqrt(252) // volatilitate zilnică %
-  
-  // SL: 1.5x volatilitate zilnică × 10 zile (2 săptămâni trading)
-  const slPct = Math.min(hvDaily * 1.5 * Math.sqrt(10), 15) // max 15%
+  const hvDaily = hv / Math.sqrt(252)
+  const slPct = Math.min(hvDaily * 1.5 * Math.sqrt(10), 15)
   const sl = parseFloat((avgPrice * (1 - slPct / 100)).toFixed(2))
 
-  // TP: bazat pe alpha + beta + RSI
-  let tpMultiplier = 2.5 // R/R minim 1:2.5
-  if (alpha3m != null && alpha3m > 10) tpMultiplier += 0.5
-  if (beta3m != null && beta3m > 2) tpMultiplier += 0.3
-  if (rsi != null && rsi < 45) tpMultiplier += 0.4 // mai mult upside dacă RSI scăzut
-  if (sma50 != null && curPrice != null && curPrice < sma50) tpMultiplier += 0.3
+  // TP1 — conservator R/R 1:1.5
+  const tp1Pct = slPct * 1.5
+  const tp1 = parseFloat((avgPrice * (1 + tp1Pct / 100)).toFixed(2))
 
-  const tpPct = slPct * tpMultiplier
-  const tp = parseFloat((avgPrice * (1 + tpPct / 100)).toFixed(2))
-  const rr = parseFloat(tpMultiplier.toFixed(1))
+  // TP2 — optimist R/R dinamic
+  let rr2 = 2.5
+  if (alpha3m != null && alpha3m > 10) rr2 += 0.5
+  if (beta3m != null && beta3m > 2) rr2 += 0.3
+  if (rsi != null && rsi < 45) rr2 += 0.4
+  if (ema50 != null && curPrice != null && curPrice < ema50) rr2 += 0.3
+  const tp2Pct = slPct * rr2
+  const tp2 = parseFloat((avgPrice * (1 + tp2Pct / 100)).toFixed(2))
 
-  return { sl, tp, slPct: slPct.toFixed(1), tpPct: tpPct.toFixed(1), rr }
+  return {
+    sl, tp1, tp2,
+    slPct: slPct.toFixed(1),
+    tp1Pct: tp1Pct.toFixed(1),
+    tp2Pct: tp2Pct.toFixed(1),
+    rr1: 1.5, rr2: parseFloat(rr2.toFixed(1)),
+  }
 }
 
 // ── Componenta principală ───────────────────────────────────
 
 export default function AnalysisCard({ p, betas }) {
-  const [hist, setHist] = useState(null)
+  const [hist3m, setHist3m] = useState(null)
+  const [hist1y, setHist1y] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showRRInfo, setShowRRInfo] = useState(false)
 
   useEffect(() => {
     setLoading(true)
-    fetchHistory(p.symbol, '3mo')
-      .then(pts => { setHist(pts || []); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetchHistory(p.symbol, '3mo'),
+      fetchHistory(p.symbol, '1y'),
+    ]).then(([h3m, h1y]) => {
+      setHist3m(h3m || [])
+      setHist1y(h1y || [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [p.symbol])
 
   const entry = betas?.[p.symbol] || {}
   const { beta3m, beta1y, alpha3m, alpha1y } = entry
 
-  const rsi    = hist ? calcRSI(hist) : null
-  const hv     = hist ? calcHV(hist)  : null
-  const sma50  = hist ? calcSMA(hist, 50)  : null
-  const sma200 = hist ? calcSMA(hist, 200) : null
+  const rsi    = hist3m ? calcRSI(hist3m)       : null
+  const hv     = hist3m ? calcHV(hist3m)         : null
+  const ema50  = hist3m ? calcEMA(hist3m, 50)    : null
+  const ema200 = hist1y ? calcEMA(hist1y, 200)   : null
   const curPrice = p.curPrice
   const avgPrice = p.avgPrice
 
   const { lines, signal, signalColor, bullScore, bearScore } = generateAnalysis({
-    beta3m, beta1y, alpha3m, alpha1y, rsi, hv, sma50, sma200, curPrice, avgPrice
+    beta3m, beta1y, alpha3m, alpha1y, rsi, hv, ema50, ema200, curPrice, avgPrice
   })
 
-  const tpsl = (!loading && hv != null) ? calcTPSL(avgPrice, hv, beta3m, alpha3m, rsi, sma50, curPrice) : null
+  const tpsl = (!loading && hv != null) ? calcTPSL(avgPrice, hv, beta3m, alpha3m, rsi, ema50, curPrice) : null
 
   const CARD = { background:'var(--surface2)', borderRadius:8, padding:'10px 12px' }
   const LBL  = { fontSize:9, color:'var(--text3)', fontWeight:600, marginBottom:4, letterSpacing:.4 }
@@ -195,11 +197,11 @@ export default function AnalysisCard({ p, betas }) {
               <div style={{fontFamily:'var(--mono)',fontWeight:800,fontSize:14,color:signalColor}}>{signal}</div>
             </div>
             <div style={{display:'flex',gap:6}}>
-              <div style={{textAlign:'center',background:'rgba(0,212,170,0.1)',borderRadius:6,padding:'4px 8px'}}>
+              <div style={{textAlign:'center',background:'rgba(0,212,170,0.1)',borderRadius:6,padding:'4px 10px'}}>
                 <div style={{fontSize:8,color:'var(--text3)'}}>BULL</div>
                 <div style={{fontFamily:'var(--mono)',fontWeight:700,color:'#00d4aa'}}>{bullScore}</div>
               </div>
-              <div style={{textAlign:'center',background:'rgba(255,85,114,0.1)',borderRadius:6,padding:'4px 8px'}}>
+              <div style={{textAlign:'center',background:'rgba(255,85,114,0.1)',borderRadius:6,padding:'4px 10px'}}>
                 <div style={{fontSize:8,color:'var(--text3)'}}>BEAR</div>
                 <div style={{fontFamily:'var(--mono)',fontWeight:700,color:'#ff5572'}}>{bearScore}</div>
               </div>
@@ -208,7 +210,6 @@ export default function AnalysisCard({ p, betas }) {
 
           {/* Grid metrici */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
-            {/* Beta */}
             <div style={CARD}>
               <div style={LBL}>BETA</div>
               <div style={{display:'flex',gap:8,alignItems:'baseline'}}>
@@ -218,20 +219,18 @@ export default function AnalysisCard({ p, betas }) {
               <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{betaLabel(beta3m)?.text}</div>
             </div>
 
-            {/* Alpha */}
             <div style={CARD}>
               <div style={LBL}>ALPHA ANUAL</div>
-              <div style={{display:'flex',gap:8,alignItems:'baseline'}}>
+              <div style={{display:'flex',gap:8,alignItems:'baseline',flexWrap:'wrap'}}>
                 {alpha3m!=null && <span style={{...VAL,color:'#a78bfa',fontSize:11}}>{alpha3m>0?'+':''}{alpha3m?.toFixed(1)}%</span>}
                 {alpha1y!=null && <span style={{...VAL,color:'#34d399',fontSize:11}}>{alpha1y>0?'+':''}{alpha1y?.toFixed(1)}%</span>}
               </div>
               <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>3L · 1A</div>
             </div>
 
-            {/* RSI */}
             <div style={CARD}>
               <div style={LBL}>RSI (14)</div>
-              <div style={{...VAL, color: rsi==null?'var(--text3)': rsi>70?'#ff5572':rsi<30?'#00d4aa':'var(--text)'}}>
+              <div style={{...VAL, color: rsi==null?'var(--text3)':rsi>70?'#ff5572':rsi<30?'#00d4aa':'var(--text)'}}>
                 {rsi ?? '—'}
               </div>
               <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>
@@ -239,7 +238,6 @@ export default function AnalysisCard({ p, betas }) {
               </div>
             </div>
 
-            {/* HV */}
             <div style={CARD}>
               <div style={LBL}>VOLATILITATE (HV)</div>
               <div style={{...VAL, color: hv==null?'var(--text3)':hv>60?'#ff5572':hv>35?'#f0b429':'#00d4aa'}}>
@@ -248,83 +246,153 @@ export default function AnalysisCard({ p, betas }) {
               <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>anualizat 20 zile</div>
             </div>
 
-            {/* SMA50 */}
             <div style={CARD}>
-              <div style={LBL}>vs SMA 50</div>
-              {sma50 != null && curPrice != null ? (() => {
-                const d = ((curPrice - sma50) / sma50 * 100)
+              <div style={LBL}>vs EMA 50</div>
+              {ema50 != null && curPrice != null ? (() => {
+                const d = ((curPrice - ema50) / ema50 * 100)
                 return <>
                   <div style={{...VAL, color: d>=0?'#00d4aa':'#ff5572'}}>{d>=0?'+':''}{d.toFixed(1)}%</div>
-                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste SMA50':'Sub SMA50'}</div>
+                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste EMA50':'Sub EMA50'}</div>
                 </>
-              })() : <div style={{...VAL}}>—</div>}
+              })() : <div style={{...VAL,color:'var(--text3)'}}>—</div>}
             </div>
 
-            {/* SMA200 */}
             <div style={CARD}>
-              <div style={LBL}>vs SMA 200</div>
-              {sma200 != null && curPrice != null ? (() => {
-                const d = ((curPrice - sma200) / sma200 * 100)
+              <div style={LBL}>vs EMA 200</div>
+              {ema200 != null && curPrice != null ? (() => {
+                const d = ((curPrice - ema200) / ema200 * 100)
                 return <>
                   <div style={{...VAL, color: d>=0?'#00d4aa':'#ff5572'}}>{d>=0?'+':''}{d.toFixed(1)}%</div>
-                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste SMA200':'Sub SMA200'}</div>
+                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste EMA200':'Sub EMA200'}</div>
                 </>
-              })() : <div style={{...VAL}}>—</div>}
+              })() : <div style={{...VAL,color:'var(--text3)'}}>—</div>}
             </div>
           </div>
 
           {/* TP / SL */}
           {tpsl && (
             <div style={{marginBottom:14,padding:'12px',background:'var(--surface2)',borderRadius:8,border:'1px solid var(--border)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              {/* Header */}
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                 <div style={{fontSize:10,color:'var(--text3)',fontWeight:600,letterSpacing:.4}}>TP / SL ESTIMAT</div>
-                <div style={{fontFamily:'var(--mono)',fontSize:10,color:'var(--text3)'}}>
-                  R/R 1:<span style={{color:'#4d9fff',fontWeight:700}}>{tpsl.rr}</span>
+                <div
+                  style={{cursor:'pointer',fontFamily:'var(--mono)',fontSize:10,color:'#4d9fff',
+                    background:'rgba(77,159,255,0.1)',borderRadius:4,padding:'2px 8px',border:'1px solid rgba(77,159,255,0.3)'}}
+                  onClick={()=>setShowRRInfo(v=>!v)}
+                >
+                  R/R 1:<span style={{fontWeight:700}}>{tpsl.rr2}</span> ℹ
                 </div>
               </div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                <div style={{textAlign:'center'}}>
-                  <div style={{fontSize:9,color:'var(--text3)',marginBottom:3}}>INTRARE</div>
-                  <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700}}>${avgPrice?.toFixed(2)}</div>
+
+              {/* R/R explicatie */}
+              {showRRInfo && (
+                <div style={{marginBottom:12,padding:'8px 10px',background:'rgba(77,159,255,0.08)',
+                  borderRadius:6,border:'1px solid rgba(77,159,255,0.2)',fontSize:10,color:'var(--text2)',lineHeight:1.6}}>
+                  <strong style={{color:'#4d9fff'}}>Risk/Reward Ratio</strong> arată câți dolari câștigați pentru fiecare dolar riscat.<br/>
+                  <strong>R/R 1:{tpsl.rr2}</strong> = riști ${(avgPrice - tpsl.sl).toFixed(2)} pentru a câștiga ${(tpsl.tp2 - avgPrice).toFixed(2)}.<br/>
+                  <span style={{color:'var(--text3)'}}>Minim recomandat: 1:2. Cu cât mai mare, cu atât mai favorabil.</span>
                 </div>
-                <div style={{textAlign:'center',background:'rgba(255,85,114,0.08)',borderRadius:6,padding:'4px'}}>
-                  <div style={{fontSize:9,color:'#ff5572',marginBottom:3,fontWeight:600}}>STOP LOSS</div>
-                  <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'#ff5572'}}>${tpsl.sl}</div>
-                  <div style={{fontSize:9,color:'#ff5572'}}>-{tpsl.slPct}%</div>
-                </div>
-                <div style={{textAlign:'center',background:'rgba(0,212,170,0.08)',borderRadius:6,padding:'4px'}}>
-                  <div style={{fontSize:9,color:'#00d4aa',marginBottom:3,fontWeight:600}}>TAKE PROFIT</div>
-                  <div style={{fontFamily:'var(--mono)',fontSize:12,fontWeight:700,color:'#00d4aa'}}>${tpsl.tp}</div>
-                  <div style={{fontSize:9,color:'#00d4aa'}}>+{tpsl.tpPct}%</div>
-                </div>
-              </div>
-              {/* Bara vizuală SL—Entry—TP */}
+              )}
+
+              {/* Bara vizuală — DEASUPRA cifrelor */}
               {(() => {
-                const min = tpsl.sl * 0.99
-                const max = tpsl.tp * 1.01
+                const min = tpsl.sl * 0.995
+                const max = tpsl.tp2 * 1.005
                 const range = max - min
-                const entryPct = ((avgPrice - min) / range * 100).toFixed(1)
-                const curPct   = curPrice ? ((curPrice - min) / range * 100).toFixed(1) : null
+                const pct = v => ((v - min) / range * 100).toFixed(2)
+                const entryPct = pct(avgPrice)
+                const curPct   = curPrice ? pct(Math.min(Math.max(curPrice, min), max)) : null
+                const slPct    = pct(tpsl.sl)
+                const tp1Pct   = pct(tpsl.tp1)
+                const tp2Pct   = pct(tpsl.tp2)
+
                 return (
-                  <div style={{marginTop:10,position:'relative',height:6,borderRadius:3,background:'var(--border)',overflow:'visible'}}>
-                    <div style={{position:'absolute',left:0,width:'100%',height:'100%',borderRadius:3,
-                      background:'linear-gradient(to right, #ff557240, #f0b42940, #00d4aa40)'}}/>
-                    {/* Entry marker */}
-                    <div style={{position:'absolute',left:`${entryPct}%`,top:-3,width:2,height:12,
-                      background:'white',borderRadius:1,transform:'translateX(-50%)'}}/>
-                    {/* Cur price marker */}
-                    {curPct && (
-                      <div style={{position:'absolute',left:`${curPct}%`,top:-4,width:8,height:8,
-                        borderRadius:'50%',background:'#4d9fff',border:'2px solid white',
-                        transform:'translate(-50%,-25%)'}}/>
-                    )}
+                  <div style={{marginBottom:14}}>
+                    {/* Labels deasupra */}
+                    <div style={{position:'relative',height:28,marginBottom:4}}>
+                      {/* SL label */}
+                      <div style={{position:'absolute',left:`${slPct}%`,transform:'translateX(-50%)',
+                        fontSize:8,color:'#ff5572',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
+                        SL<br/>${tpsl.sl}
+                      </div>
+                      {/* Entry label */}
+                      <div style={{position:'absolute',left:`${entryPct}%`,transform:'translateX(-50%)',
+                        fontSize:8,color:'white',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
+                        IN<br/>${avgPrice?.toFixed(2)}
+                      </div>
+                      {/* TP1 label */}
+                      <div style={{position:'absolute',left:`${tp1Pct}%`,transform:'translateX(-50%)',
+                        fontSize:8,color:'#4d9fff',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
+                        TP1<br/>${tpsl.tp1}
+                      </div>
+                      {/* TP2 label */}
+                      <div style={{position:'absolute',left:`${tp2Pct}%`,transform:'translateX(-50%)',
+                        fontSize:8,color:'#00d4aa',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
+                        TP2<br/>${tpsl.tp2}
+                      </div>
+                    </div>
+
+                    {/* Bara */}
+                    <div style={{position:'relative',height:10,borderRadius:5,
+                      background:'linear-gradient(to right, #ff557250, #f0b42930, #4d9fff40, #00d4aa50)',
+                      overflow:'visible'}}>
+                      {/* SL marker */}
+                      <div style={{position:'absolute',left:`${slPct}%`,top:-2,width:2,height:14,
+                        background:'#ff5572',borderRadius:1,transform:'translateX(-50%)'}}/>
+                      {/* Entry marker */}
+                      <div style={{position:'absolute',left:`${entryPct}%`,top:-3,width:3,height:16,
+                        background:'white',borderRadius:1,transform:'translateX(-50%)'}}/>
+                      {/* TP1 marker */}
+                      <div style={{position:'absolute',left:`${tp1Pct}%`,top:-2,width:2,height:14,
+                        background:'#4d9fff',borderRadius:1,transform:'translateX(-50%)'}}/>
+                      {/* TP2 marker */}
+                      <div style={{position:'absolute',left:`${tp2Pct}%`,top:-2,width:2,height:14,
+                        background:'#00d4aa',borderRadius:1,transform:'translateX(-50%)'}}/>
+                      {/* Cur price dot */}
+                      {curPct && (
+                        <div style={{position:'absolute',left:`${curPct}%`,top:'50%',width:10,height:10,
+                          borderRadius:'50%',background:'#f0b429',border:'2px solid white',
+                          transform:'translate(-50%,-50%)',zIndex:2}}/>
+                      )}
+                    </div>
+
+                    {/* Labels sub bara */}
+                    <div style={{position:'relative',height:16,marginTop:4}}>
+                      <div style={{position:'absolute',left:`${slPct}%`,transform:'translateX(-50%)',
+                        fontSize:7,color:'var(--text3)',fontFamily:'var(--mono)',whiteSpace:'nowrap'}}>
+                        -{tpsl.slPct}%
+                      </div>
+                      <div style={{position:'absolute',left:`${tp1Pct}%`,transform:'translateX(-50%)',
+                        fontSize:7,color:'var(--text3)',fontFamily:'var(--mono)',whiteSpace:'nowrap'}}>
+                        +{tpsl.tp1Pct}%
+                      </div>
+                      <div style={{position:'absolute',left:`${tp2Pct}%`,transform:'translateX(-50%)',
+                        fontSize:7,color:'var(--text3)',fontFamily:'var(--mono)',whiteSpace:'nowrap'}}>
+                        +{tpsl.tp2Pct}%
+                      </div>
+                    </div>
                   </div>
                 )
               })()}
-              <div style={{display:'flex',justifyContent:'space-between',marginTop:6,fontSize:8,color:'var(--text3)'}}>
-                <span>SL ${tpsl.sl}</span>
-                <span style={{color:'white'}}>▲ Intrare</span>
-                <span>TP ${tpsl.tp}</span>
+
+              {/* Cifre */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6}}>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontSize:8,color:'var(--text3)',marginBottom:2}}>INTRARE</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700}}>${avgPrice?.toFixed(2)}</div>
+                </div>
+                <div style={{textAlign:'center',background:'rgba(255,85,114,0.08)',borderRadius:6,padding:'4px 2px'}}>
+                  <div style={{fontSize:8,color:'#ff5572',marginBottom:2,fontWeight:600}}>STOP LOSS</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:'#ff5572'}}>${tpsl.sl}</div>
+                </div>
+                <div style={{textAlign:'center',background:'rgba(77,159,255,0.08)',borderRadius:6,padding:'4px 2px'}}>
+                  <div style={{fontSize:8,color:'#4d9fff',marginBottom:2,fontWeight:600}}>TP 1</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:'#4d9fff'}}>${tpsl.tp1}</div>
+                </div>
+                <div style={{textAlign:'center',background:'rgba(0,212,170,0.08)',borderRadius:6,padding:'4px 2px'}}>
+                  <div style={{fontSize:8,color:'#00d4aa',marginBottom:2,fontWeight:600}}>TP 2</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:'#00d4aa'}}>${tpsl.tp2}</div>
+                </div>
               </div>
             </div>
           )}
@@ -340,12 +408,12 @@ export default function AnalysisCard({ p, betas }) {
             ))}
           </div>
 
-          {/* Disclaimer */}
           <div style={{marginTop:10,fontSize:9,color:'var(--text3)',fontStyle:'italic',lineHeight:1.5}}>
-            ⚠️ Estimări statistice bazate pe date istorice. Nu constituie recomandare de investiție. TP/SL calculat din volatilitate istorică.
+            ⚠️ Estimări statistice bazate pe date istorice.
           </div>
         </>
       )}
     </div>
   )
 }
+
