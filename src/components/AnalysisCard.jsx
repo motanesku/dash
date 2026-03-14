@@ -220,12 +220,12 @@ export default function AnalysisCard({ p, betas }) {
             </div>
 
             <div style={CARD}>
-              <div style={LBL}>ALPHA ANUAL</div>
-              <div style={{display:'flex',gap:8,alignItems:'baseline',flexWrap:'wrap'}}>
-                {alpha3m!=null && <span style={{...VAL,color:'#a78bfa',fontSize:11}}>{alpha3m>0?'+':''}{alpha3m?.toFixed(1)}%</span>}
-                {alpha1y!=null && <span style={{...VAL,color:'#34d399',fontSize:11}}>{alpha1y>0?'+':''}{alpha1y?.toFixed(1)}%</span>}
+              <div style={LBL}>ALPHA</div>
+              <div style={{display:'flex',gap:8,alignItems:'baseline'}}>
+                {alpha3m!=null && <span style={{...VAL,color:'#a78bfa'}}>α3L {alpha3m>0?'+':''}{alpha3m?.toFixed(1)}%</span>}
+                {alpha1y!=null && <span style={{...VAL,fontSize:11,color:'#34d399'}}>α1A {alpha1y>0?'+':''}{alpha1y?.toFixed(1)}%</span>}
               </div>
-              <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>3L · 1A</div>
+              <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{alphaLabel(alpha3m)?.text}</div>
             </div>
 
             <div style={CARD}>
@@ -243,27 +243,29 @@ export default function AnalysisCard({ p, betas }) {
               <div style={{...VAL, color: hv==null?'var(--text3)':hv>60?'#ff5572':hv>35?'#f0b429':'#00d4aa'}}>
                 {hv != null ? `${hv}%` : '—'}
               </div>
-              <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>anualizat 20 zile</div>
+              <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>
+                {hv==null?'—':hv>60?'Mișcări mari, risc ridicat':hv>35?'Volatilitate medie':hv>20?'Mișcări moderate':'Stabilă, predictibilă'}
+              </div>
             </div>
 
             <div style={CARD}>
-              <div style={LBL}>vs EMA 50</div>
+              <div style={LBL}>Pret actual vs EMA 50</div>
               {ema50 != null && curPrice != null ? (() => {
                 const d = ((curPrice - ema50) / ema50 * 100)
                 return <>
                   <div style={{...VAL, color: d>=0?'#00d4aa':'#ff5572'}}>{d>=0?'+':''}{d.toFixed(1)}%</div>
-                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste EMA50':'Sub EMA50'}</div>
+                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Preț peste EMA50':'Preț sub EMA50'}</div>
                 </>
               })() : <div style={{...VAL,color:'var(--text3)'}}>—</div>}
             </div>
 
             <div style={CARD}>
-              <div style={LBL}>vs EMA 200</div>
+              <div style={LBL}>Pret actual vs EMA 200</div>
               {ema200 != null && curPrice != null ? (() => {
                 const d = ((curPrice - ema200) / ema200 * 100)
                 return <>
                   <div style={{...VAL, color: d>=0?'#00d4aa':'#ff5572'}}>{d>=0?'+':''}{d.toFixed(1)}%</div>
-                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Peste EMA200':'Sub EMA200'}</div>
+                  <div style={{fontSize:9,color:'var(--text3)',marginTop:3}}>{d>=0?'Preț peste EMA200':'Preț sub EMA200'}</div>
                 </>
               })() : <div style={{...VAL,color:'var(--text3)'}}>—</div>}
             </div>
@@ -312,23 +314,23 @@ export default function AnalysisCard({ p, betas }) {
                     <div style={{position:'relative',height:28,marginBottom:4}}>
                       {/* SL label */}
                       <div style={{position:'absolute',left:`${slPct}%`,transform:'translateX(-50%)',
-                        fontSize:8,color:'#ff5572',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
-                        SL<br/>${tpsl.sl}
+                        fontSize:8,color:'#ff5572',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center'}}>
+                        SL
                       </div>
                       {/* Entry label */}
                       <div style={{position:'absolute',left:`${entryPct}%`,transform:'translateX(-50%)',
-                        fontSize:8,color:'white',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
-                        IN<br/>${avgPrice?.toFixed(2)}
+                        fontSize:8,color:'#e2b96a',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center'}}>
+                        IN
                       </div>
                       {/* TP1 label */}
                       <div style={{position:'absolute',left:`${tp1Pct}%`,transform:'translateX(-50%)',
-                        fontSize:8,color:'#4d9fff',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
-                        TP1<br/>${tpsl.tp1}
+                        fontSize:8,color:'#4d9fff',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center'}}>
+                        TP1
                       </div>
                       {/* TP2 label */}
                       <div style={{position:'absolute',left:`${tp2Pct}%`,transform:'translateX(-50%)',
-                        fontSize:8,color:'#00d4aa',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
-                        TP2<br/>${tpsl.tp2}
+                        fontSize:8,color:'#00d4aa',fontFamily:'var(--mono)',fontWeight:600,textAlign:'center'}}>
+                        TP2
                       </div>
                     </div>
 
@@ -341,7 +343,7 @@ export default function AnalysisCard({ p, betas }) {
                         background:'#ff5572',borderRadius:1,transform:'translateX(-50%)'}}/>
                       {/* Entry marker */}
                       <div style={{position:'absolute',left:`${entryPct}%`,top:-3,width:3,height:16,
-                        background:'white',borderRadius:1,transform:'translateX(-50%)'}}/>
+                        background:'#e2b96a',borderRadius:1,transform:'translateX(-50%)'}}/>
                       {/* TP1 marker */}
                       <div style={{position:'absolute',left:`${tp1Pct}%`,top:-2,width:2,height:14,
                         background:'#4d9fff',borderRadius:1,transform:'translateX(-50%)'}}/>
@@ -379,7 +381,7 @@ export default function AnalysisCard({ p, betas }) {
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6}}>
                 <div style={{textAlign:'center'}}>
                   <div style={{fontSize:8,color:'var(--text3)',marginBottom:2}}>INTRARE</div>
-                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700}}>${avgPrice?.toFixed(2)}</div>
+                  <div style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:'#e2b96a'}}>${avgPrice?.toFixed(2)}</div>
                 </div>
                 <div style={{textAlign:'center',background:'rgba(255,85,114,0.08)',borderRadius:6,padding:'4px 2px'}}>
                   <div style={{fontSize:8,color:'#ff5572',marginBottom:2,fontWeight:600}}>STOP LOSS</div>
@@ -409,7 +411,7 @@ export default function AnalysisCard({ p, betas }) {
           </div>
 
           <div style={{marginTop:10,fontSize:9,color:'var(--text3)',fontStyle:'italic',lineHeight:1.5}}>
-            ⚠️ Estimări statistice bazate pe date istorice.
+            ⚠️ Estimări statistice bazate pe date istorice. 
           </div>
         </>
       )}
