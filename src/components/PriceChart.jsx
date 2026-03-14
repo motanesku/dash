@@ -8,6 +8,9 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
   const [error, setError] = useState(null)
   const [range, setRange] = useState('3mo')
 
+  const priceSeriesRef = useRef(null)
+  const avgSeriesRef = useRef(null)
+
   useEffect(() => {
     if (!containerRef.current || !symbol) return
     let chart
@@ -18,6 +21,8 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
         if (chartRef.current) {
           chartRef.current.remove()
           chartRef.current = null
+          priceSeriesRef.current = null
+          avgSeriesRef.current = null
         }
         chart = createChart(containerRef.current, {
           width: containerRef.current.clientWidth,
@@ -56,7 +61,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
           topColor: 'rgba(77,159,255,0.15)',
           bottomColor: 'rgba(77,159,255,0.0)',
           lineWidth: 1,
-          lineStyle: 2,
+          lineStyle: 0,
           crosshairMarkerVisible: true,
           crosshairMarkerRadius: 4,
           crosshairMarkerBorderColor: '#4d9fff',
@@ -64,6 +69,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
           lastValueVisible: false,
           priceLineVisible: false,
         })
+        priceSeriesRef.current = series
 
         setLoading(true)
         const points = await fetchHistory(symbol, range)
@@ -72,13 +78,12 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
         const data = points.map(p => ({ time: p.date, value: p.close }))
         series.setData(data)
 
-        // Linie avg price — portocalie punctată cu etichetă în stânga
+        // Linie avg price — portocalie punctată
         if (avgPrice != null && points.length >= 2) {
-          // Linia punctată
           const avgSeries = chart.addLineSeries({
             color: '#f0b429',
             lineWidth: 1,
-            lineStyle: 2, // dashed
+            lineStyle: 2,
             crosshairMarkerVisible: false,
             lastValueVisible: true,
             priceLineVisible: false,
@@ -88,8 +93,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
             { time: points[0].date,                 value: avgPrice },
             { time: points[points.length - 1].date, value: avgPrice },
           ])
-
-
+          avgSeriesRef.current = avgSeries
         }
 
         chart.timeScale().fitContent()
@@ -158,5 +162,6 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
     </div>
   )
 }
+
 
 
