@@ -341,6 +341,64 @@ const useStore = create((set, get) => ({
     try { localStorage.setItem('ptf_v6_notif', String(next)); } catch {}
     set({ notificationsEnabled: next });
   },
+
+  loadAlerts: async () => {
+    const { loadAlertsFromCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const cloudAlerts = await loadAlertsFromCloud();
+    if (cloudAlerts && cloudAlerts.length > 0) {
+      set({ alerts: cloudAlerts });
+      saveLocal(cloudAlerts);
+    }
+  },
+
+  addAlert: async (alert) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const next = [...get().alerts, { ...alert, id: Date.now(), triggered: false, triggeredAt: null }];
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
+  },
+  deleteAlert: async (id) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const next = get().alerts.filter(a => a.id !== id);
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
+  },
+  clearTriggeredAlerts: async () => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const next = get().alerts.filter(a => !a.triggered);
+    set({ alerts: next });
+    saveLocal(next);
+    await syncAlertsToCloud(next);
+  },
+  checkAlerts: async (prices) => {
+    const { syncAlertsToCloud, saveAlerts: saveLocal } = await import('./sheets.js');
+    const alerts = get().alerts;
+    const notifEnabled = get().notificationsEnabled;
+    let changed = false;
+    const next = alerts.map(a => {
+      if (a.triggered) return a;
+      const p = prices[a.symbol]?.price;
+      if (!p) return a;
+      const hit = a.direction === 'above' ? p >= a.target : p <= a.target;
+      if (hit) {
+        changed = true;
+        if (notifEnabled && Notification.permission === 'granted') {
+          new Notification(`📈 Alert: ${a.symbol}`, {
+            body: `Prețul a ajuns la ${p.toFixed(2)} (target: ${a.target})`,
+          });
+        }
+        return { ...a, triggered: true, triggeredAt: new Date().toISOString() };
+      }
+      return a;
+    });
+    if (changed) {
+      set({ alerts: next });
+      saveLocal(next);
+      await syncAlertsToCloud(next);
+    }
+  },
 }));
 
 export default useStore;
