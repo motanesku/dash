@@ -8,7 +8,7 @@ import MarketStatus from '../components/MarketStatus.jsx'
 import PerformanceChart from '../components/PerformanceChart.jsx'
 import SectorPieChart from '../components/SectorPieChart.jsx'
 import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
-import { fetchBetas, betaLabel, calcPortfolioBeta } from '../lib/beta.js'
+import { fetchBetas, betaLabel, alphaLabel, calcPortfolioBeta } from '../lib/beta.js'
 import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
 import CorrelationHeatmap from '../components/CorrelationHeatmap.jsx'
 
@@ -153,6 +153,263 @@ function SkeletonCard() {
   )
 }
 
+// ── Sharpe Ratio (simplified, pe returnuri zilnice disponibile) ─
+function calcSharpe(positions, betas) {
+  // Folosim beta ca proxy pentru volatilitate dacă nu avem returnuri istorice
+  // Sharpe simplificat: uPct_anualizat / (beta * stdev_SP500)
+  // Returnam null dacă nu avem date suficiente
+  return null // placeholder — override mai jos cu calcul real
+}
+
+// ── Portfolio Summary Component ─────────────────────────────
+function PortfolioSummary({ agg, positions, closedPositions, cashTotal, cashPct, portfolioBeta, betas }) {
+  const [sharpe, setSharpe] = useState(null)
+  const [spHistory, setSpHistory] = useState(null)
+
+  // Calculăm Sharpe din returnuri SP500 + portofoliu (aproximat pe costBasis)
+  useEffect(() => {
+    fetchHistory('^GSPC', '1y').then(pts => setSpHistory(pts)).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!spHistory || !positions.length) return
+    // Returnuri zilnice SP500
+    const spRets = spHistory.slice(1).map((p, i) => (p.close - spHistory[i].close) / spHistory[i].close)
+    if (spRets.length < 30) return
+    const meanSp  = spRets.reduce((s, v) => s + v, 0) / spRets.length
+    const stdSp   = Math.sqrt(spRets.reduce((s, v) => s + (v - meanSp) ** 2, 0) / spRets.length)
+    // P&L% portofoliu anualizat
+    const totalInv = agg.totalCostBasis + cashTotal
+    const totalVal = agg.totalCurValue  + cashTotal
+    const retAnn   = totalInv > 0 ? (totalVal - totalInv) / totalInv : 0
+    // Risk-free rate ~4.5% anual (~0.018% zilnic)
+    const rf = 0.045
+    // Std portofoliu ≈ beta × std SP500 × sqrt(252)
+    const beta  = portfolioBeta ?? 1
+    const stdAnn = beta * stdSp * Math.sqrt(252)
+    if (stdAnn === 0) return
+    const s = (retAnn - rf) / stdAnn
+    setSharpe(parseFloat(s.toFixed(2)))
+  }, [spHistory, positions, agg, cashTotal, portfolioBeta])
+
+  const totalInvested = agg.totalCostBasis + cashTotal
+  const totalActual   = agg.totalCurValue  + cashTotal
+  const pnlReal       = totalActual - totalInvested
+  const pnlPct        = totalInvested > 0 ? (pnlReal / totalInvested) * 100 : 0
+  const pnlPositive   = pnlReal >= 0
+  const pnlColor      = pnlPositive ? 'var(--green)' : 'var(--red)'
+  const pnlArrow      = pnlPositive ? '▲' : '▼'
+
+  // Top 3 concentrare
+  const totalStocuri = positions.reduce((s, p) => s + (p.curValue || 0), 0)
+  const sortedByVal  = [...positions].sort((a, b) => (b.curValue || 0) - (a.curValue || 0))
+  const top3         = sortedByVal.slice(0, 3)
+  const top3Pct      = top3.reduce((s, p) => s + (p.curValue || 0), 0) / (totalActual || 1) * 100
+
+  // Best & Worst (pe % nerealizat)
+  const withPct = positions.filter(p => p.unrealizedPct != null)
+  const best    = withPct.length ? withPct.reduce((a, b) => (b.unrealizedPct > a.unrealizedPct ? b : a)) : null
+  const worst   = withPct.length ? withPct.reduce((a, b) => (b.unrealizedPct < a.unrealizedPct ? b : a)) : null
+
+  // Sharpe label
+  function sharpeLabel(s) {
+    if (s == null) return { text: 'Se calculează...', color: 'var(--text3)' }
+    if (s > 2)    return { text: 'Excelent',   color: 'var(--green)',  emoji: '🏆' }
+    if (s > 1)    return { text: 'Bun',         color: '#34d399',       emoji: '✅' }
+    if (s > 0)    return { text: 'Acceptabil',  color: '#f0b429',       emoji: '📊' }
+    if (s > -1)   return { text: 'Slab',        color: '#fb923c',       emoji: '⚠️' }
+    return               { text: 'Negativ',     color: 'var(--red)',    emoji: '🔻' }
+  }
+
+  const betaLbl   = portfolioBeta != null ? betaLabel(portfolioBeta) : null
+  const sharpeLbl = sharpeLabel(sharpe)
+
+  if (!positions.length && cashTotal === 0) return null
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      {/* Titlu */}
+      <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+          textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+          📋 Sumar Portofoliu
+        </span>
+        {positions.length > 0 && (
+          <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+            · {[...new Set(positions.map(p => p.symbol))].length} tickere deschise
+          </span>
+        )}
+      </div>
+
+      {/* ── Rând 1: Card principal ── */}
+      <div className="card fade-up" style={{
+        padding: '18px 20px', marginBottom: 10,
+        borderLeft: `3px solid ${pnlColor}`,
+        background: 'var(--surface)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)',
+              fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>TOTAL INVESTIT</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+              {fmtC(totalInvested)}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, fontFamily: 'var(--mono)' }}>
+              {positions.length} stocuri · {fmtC(cashTotal)} cash
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)',
+              fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>VALOARE ACTUALĂ</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
+              {fmtC(totalActual)}
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 14, fontWeight: 700,
+              color: pnlColor, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+              <span>{pnlArrow}</span>
+              <span>{fmtC(Math.abs(pnlReal))}</span>
+              <span style={{ fontSize: 11, opacity: .85 }}>({pnlPositive ? '+' : '-'}{Math.abs(pnlPct).toFixed(2)}%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Rând 2: Nerealizat / Realizat / Cash ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+        {/* Nerealizat */}
+        <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}` }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>NEREALIZAT</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700,
+            color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {fmtC(agg.totalUnrealized)}
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 3,
+            color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {agg.uPct >= 0 ? '+' : ''}{agg.uPct.toFixed(2)}%
+          </div>
+        </div>
+
+        {/* Realizat */}
+        <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--purple)' }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>
+            REALIZAT <span style={{ fontSize: 8, opacity: .6 }}>(info)</span>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700,
+            color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {fmtC(agg.totalRealized)}
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 3,
+            color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {agg.rPct >= 0 ? '+' : ''}{agg.rPct.toFixed(2)}%
+          </div>
+        </div>
+
+        {/* Cash */}
+        <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--gold)' }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>💵 CASH</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
+            {fmtC(cashTotal)}
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+            {cashPct.toFixed(1)}% port.
+          </div>
+        </div>
+      </div>
+
+      {/* ── Titlu Analiză ── */}
+      {positions.length > 0 && (
+        <>
+          <div style={{ marginBottom: 8, marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+              🔬 Metrici Risc
+            </span>
+          </div>
+
+          {/* ── Rând 3: Beta + Sharpe (card mic x2) ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            {/* Beta */}
+            <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${betaLbl?.color || 'var(--border)'}` }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>BETA PORTOFOLIU</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: betaLbl?.color || 'var(--text)' }}>
+                β {portfolioBeta != null ? portfolioBeta.toFixed(2) : '—'}
+              </div>
+              <div style={{ fontSize: 10, color: betaLbl?.color || 'var(--text3)', marginTop: 3 }}>
+                {betaLbl ? `${betaLbl.emoji} ${betaLbl.text}` : '—'}
+              </div>
+            </div>
+
+            {/* Sharpe */}
+            <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${sharpeLbl.color}` }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>SHARPE RATIO</div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: sharpeLbl.color }}>
+                {sharpe != null ? sharpe.toFixed(2) : '—'}
+              </div>
+              <div style={{ fontSize: 10, color: sharpeLbl.color, marginTop: 3 }}>
+                {sharpeLbl.emoji ? `${sharpeLbl.emoji} ${sharpeLbl.text}` : sharpeLbl.text}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Rând 4: Best + Worst ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--green)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>🏆 BEST</div>
+              {best ? <>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{best.symbol}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 600, marginTop: 3 }}>
+                  +{best.unrealizedPct.toFixed(2)}% · {fmtC(best.unrealizedPnl)}
+                </div>
+              </> : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
+            </div>
+
+            <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--red)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>📉 WORST</div>
+              {worst ? <>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{worst.symbol}</div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 600, marginTop: 3 }}>
+                  {worst.unrealizedPct.toFixed(2)}% · {fmtC(worst.unrealizedPnl)}
+                </div>
+              </> : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
+            </div>
+          </div>
+
+          {/* ── Rând 5: Concentrare TOP 3 (card lat) ── */}
+          <div className="card" style={{ padding: '12px 16px', borderLeft: '2px solid var(--blue)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em' }}>
+                📊 CONCENTRARE TOP 3
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: top3Pct > 60 ? 'var(--red)' : top3Pct > 40 ? '#f0b429' : 'var(--green)',
+                fontWeight: 600 }}>
+                {top3Pct.toFixed(1)}% din port.
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {top3.map((p, i) => {
+                const pct = totalActual > 0 ? (p.curValue || 0) / totalActual * 100 : 0
+                const barW = top3[0]?.curValue > 0 ? (p.curValue || 0) / top3[0].curValue * 100 : 0
+                const colors = ['#58a6ff', '#00d4aa', '#a78bfa']
+                return (
+                  <div key={p.symbol} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 36px', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{p.symbol}</span>
+                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${barW}%`, background: colors[i], borderRadius: 3, transition: 'width 1s ease' }}/>
+                    </div>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', textAlign: 'right' }}>
+                      {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const txs = useStore(s => s.txs)
   const prices = useStore(s => s.prices)
@@ -225,30 +482,16 @@ export default function Dashboard() {
       <FearGreedBanner fearGreed={fearGreed} vix={vix} />
       <MarketCards prices={{...prices,...marketData}} />
 
-      {/* ── Titlu Sumar Portofoliu ── */}
-      <div style={{ marginBottom:10, marginTop:4, display:'flex', alignItems:'center', gap:8 }}>
-        <span style={{
-          fontSize:11, fontWeight:700, letterSpacing:'0.08em',
-          textTransform:'uppercase', color:'var(--text3)', fontFamily:'var(--mono)',
-        }}>📋 Sumar Portofoliu</span>
-        {positions.length>0 && (
-          <span style={{ fontSize:10, color:'var(--text3)', fontFamily:'var(--mono)' }}>
-            · {positions.length} poziții deschise
-          </span>
-        )}
-      </div>
-
-      <div style={{ display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:12,marginBottom:20 }}>
-        <StatCard delay={1} label="Total Investit" value={fmtC(agg.totalCostBasis + cashTotal)} sub={`stocuri + ${fmtC(cashTotal)} cash`} accent="var(--text3)"/>
-        <StatCard delay={2} label="Valoare Actuală" value={fmtC(agg.totalCurValue + cashTotal)} sub={`${positions.length} poziții + cash`} accent="var(--blue)"/>
-        <StatCard delay={3} label="Profit Nerealizat" value={fmtC(agg.totalUnrealized)} sub={fmtPct(agg.uPct)} subClass={pnlClass(agg.totalUnrealized)} accent={agg.totalUnrealized>=0?'var(--green)':'var(--red)'}/>
-        <StatCard delay={4} label="Profit Realizat" value={fmtC(agg.totalRealized)} sub={fmtPct(agg.rPct)} subClass={pnlClass(agg.totalRealized)} accent="var(--purple)"/>
-        <StatCard delay={5} label="💵 Cash" value={fmtC(cashTotal)} sub={fmtPct(cashPct,false)+' din port.'} accent="var(--gold)"/>
-        {portfolioBeta != null && (() => {
-          const lbl = betaLabel(portfolioBeta)
-          return <StatCard delay={6} label="Beta Portofoliu" value={`β ${portfolioBeta.toFixed(2)}`} sub={`${lbl.emoji} ${lbl.text}`} accent={lbl.color}/>
-        })()}
-      </div>
+      {/* ── Sumar Portofoliu ── */}
+      <PortfolioSummary
+        agg={agg}
+        positions={positions}
+        closedPositions={closedPositions}
+        cashTotal={cashTotal}
+        cashPct={cashPct}
+        portfolioBeta={portfolioBeta}
+        betas={betas}
+      />
 
       {positions.length>0 && (
         <div className="card fade-up delay-5" style={{ padding:'16px 18px',marginBottom:20 }}>
@@ -285,3 +528,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
