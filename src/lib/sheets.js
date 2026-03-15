@@ -113,16 +113,16 @@ export function saveBrokers(brokers) {
 }
 
 // ── Price Alerts — localStorage per device ─────────────────
-// Format: { [symbol]: { targetPrice, stopLoss, dayChangePct, vixPrag } }
+// Store-ul folosește format array, alerts.js folosește format obiect {sym:{...}}
+// Sunt două sisteme separate: store pentru cloud sync, alerts.js pentru UI local
 export function loadAlerts() {
   try {
     const s = localStorage.getItem(ALERTS_KEY)
-    if (!s) return {}
+    if (!s) return []
     const parsed = JSON.parse(s)
-    // Dacă cumva e array (din versiune anterioară), returnează obiect gol
-    if (Array.isArray(parsed)) return {}
-    return parsed
-  } catch { return {} }
+    if (Array.isArray(parsed)) return parsed
+    return [] // obiect vechi — incompatibil cu store array
+  } catch { return [] }
 }
 
 export function saveAlerts(alerts) {
