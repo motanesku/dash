@@ -344,15 +344,34 @@ const useStore = create((set, get) => ({
     // Already loaded from localStorage on init
   },
 
-  // ── Price Alerts ─────────────────────────────────────────
-  // Format obiect { [symbol]: {targetPrice, stopLoss, dayChangePct, vixPrag} }
-  // Stocat în localStorage per device — fără cloud sync
+  // ── Price Alerts store — format array pentru AlertsPanel ──
+  // [{id, symbol, target, direction, triggered}]
+  // SEPARAT de alerts.js care e format obiect pentru Positions.jsx
   alerts: loadAlerts(),
 
-  // loadAlerts e apelat din App.jsx la startup — reîncarcă din localStorage
   loadAlerts: async () => {
-    const { loadAlerts: load } = await import('./alerts.js');
+    // Reîncarcă alertele store din localStorage (array format)
+    const { loadAlerts: load } = await import('./sheets.js');
     set({ alerts: load() });
+  },
+
+  addAlert: async (alert) => {
+    const { saveAlerts } = await import('./sheets.js');
+    const next = [...get().alerts, { ...alert, id: Date.now(), triggered: false, triggeredAt: null }];
+    set({ alerts: next });
+    saveAlerts(next);
+  },
+  deleteAlert: async (id) => {
+    const { saveAlerts } = await import('./sheets.js');
+    const next = get().alerts.filter(a => a.id !== id);
+    set({ alerts: next });
+    saveAlerts(next);
+  },
+  clearTriggeredAlerts: async () => {
+    const { saveAlerts } = await import('./sheets.js');
+    const next = get().alerts.filter(a => !a.triggered);
+    set({ alerts: next });
+    saveAlerts(next);
   },
 
   // Per-device notification toggle
@@ -365,13 +384,13 @@ const useStore = create((set, get) => ({
     set({ notificationsEnabled: next });
   },
 
-  // checkAlerts — verifică alertele obiect față de prețurile curente
+  // checkAlerts — verifică alertele din Positions (obiect) față de prețurile curente
   checkAlerts: async (prices) => {
-    const { checkAndNotify } = await import('./alerts.js');
-    const alerts = get().alerts;
+    const { checkAndNotify, loadAlerts: loadObj } = await import('./alerts.js');
+    const objAlerts = loadObj();
     const marketData = get().marketData;
-    if (alerts && Object.keys(alerts).length) {
-      checkAndNotify(prices, marketData, alerts);
+    if (objAlerts && Object.keys(objAlerts).length) {
+      checkAndNotify(prices, marketData, objAlerts);
     }
   },
 }));
