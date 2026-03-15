@@ -1,15 +1,15 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
-import { requestNotificationPermission } from '../lib/notifications.js'
+import { requestNotificationPermission, registerPeriodicSync } from '../lib/notifications.js'
 import { loadAlerts, checkAndNotify } from '../lib/alerts.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
 import MarketStatus from '../components/MarketStatus.jsx'
 import PerformanceChart from '../components/PerformanceChart.jsx'
 import SectorPieChart from '../components/SectorPieChart.jsx'
-import { calcPortfolio, aggregatePositions, fmtC, fmtPct, pnlClass } from '../lib/portfolio.js'
+import { calcPortfolio, aggregatePositions, fmtC, fmtPct, fmtV, pnlClass } from '../lib/portfolio.js'
 import { fetchBetas, betaLabel, alphaLabel, calcPortfolioBeta } from '../lib/beta.js'
-import { MARKET_SYMBOLS, fetchHistory } from '../lib/prices.js'
+import { MARKET_SYMBOLS, fetchHistory, fetchHistoryMulti } from '../lib/prices.js'
 import CorrelationHeatmap from '../components/CorrelationHeatmap.jsx'
 
 const COLORS = ['#58a6ff','#00d4aa','#a78bfa','#f0b429','#ff5572','#34d399','#fb923c','#60a5fa']
@@ -154,14 +154,6 @@ function SkeletonCard() {
 }
 
 
-// ── Helper: formatează valoare fără sufix USD ───────────────
-function fmt(val) {
-  if (val == null) return '—'
-  const abs = Math.abs(val)
-  const sign = val < 0 ? '-' : ''
-  return sign + new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
-}
-
 // ── Bottom-sheet tooltip la tap ──────────────────────────────
 function MetricTooltip({ visible, onClose, title, lines }) {
   if (!visible) return null
@@ -195,29 +187,116 @@ function MetricTooltip({ visible, onClose, title, lines }) {
 }
 
 // ── Portfolio Summary ─────────────────────────────────────────
-function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta }) {
+function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBeta, prices }) {
   const companyInfo = useStore(s => s.companyInfo)
   const [sharpe, setSharpe] = useState(null)
-  const [spHistory, setSpHistory] = useState(null)
   const [tooltip, setTooltip] = useState(null) // 'beta' | 'sharpe' | null
 
+  // ── Sharpe REAL — reconstituie NAV zilnic din tranzacții + prețuri istorice ──
   useEffect(() => {
-    fetchHistory('^GSPC', '1y').then(pts => setSpHistory(pts)).catch(() => {})
-  }, [])
+    if (!txs.length || !positions.length) return
+    let cancelled = false
 
-  useEffect(() => {
-    if (!spHistory || !positions.length) return
-    const spRets = spHistory.slice(1).map((p, i) => (p.close - spHistory[i].close) / spHistory[i].close)
-    if (spRets.length < 30) return
-    const meanSp = spRets.reduce((s, v) => s + v, 0) / spRets.length
-    const stdSp  = Math.sqrt(spRets.reduce((s, v) => s + (v - meanSp) ** 2, 0) / spRets.length)
-    const totalInv = agg.totalCostBasis + cashTotal
-    const totalVal = agg.totalCurValue  + cashTotal
-    const retAnn   = totalInv > 0 ? (totalVal - totalInv) / totalInv : 0
-    const stdAnn   = (portfolioBeta ?? 1) * stdSp * Math.sqrt(252)
-    if (stdAnn === 0) return
-    setSharpe(parseFloat(((retAnn - 0.045) / stdAnn).toFixed(2)))
-  }, [spHistory, positions, agg, cashTotal, portfolioBeta])
+    const calcRealSharpe = async () => {
+      try {
+        // Ia simbolurile unice din portofoliu
+        const syms = [...new Set(positions.map(p => p.symbol))]
+        if (!syms.length) return
+
+        // Fetch istorii pentru toate simbolurile + SP500 în paralel
+        const [spHist, symHistories] = await Promise.all([
+          fetchHistory('^GSPC', '1y'),
+          fetchHistoryMulti(syms, '1y'),
+        ])
+        if (cancelled || !spHist?.length) return
+
+        // Construiește un map date → preț pentru fiecare simbol
+        const priceMap = {}
+        syms.forEach(sym => {
+          if (symHistories[sym]?.length) {
+            priceMap[sym] = {}
+            symHistories[sym].forEach(p => { priceMap[sym][p.date] = p.close })
+          }
+        })
+
+        // Toate datele de tranzacționare disponibile în SP500, sortate
+        const allDates = spHist.map(p => p.date).sort()
+
+        // Reconstituie pozițiile la fiecare dată (FIFO snapshot)
+        const sortedTxs = [...txs]
+          .filter(t => t.type !== 'DEPOSIT')
+          .sort((a, b) => a.date < b.date ? -1 : 1)
+
+        const navByDate = {}
+        const lots = {} // symbol → [{shares, price}]
+        let txIdx = 0
+
+        for (const date of allDates) {
+          // Aplică tranzacțiile până la această dată
+          while (txIdx < sortedTxs.length && sortedTxs[txIdx].date <= date) {
+            const t = sortedTxs[txIdx]
+            const sym = t.symbol || t.sym
+            if (!lots[sym]) lots[sym] = []
+            if (t.type === 'BUY') {
+              lots[sym].push({ shares: t.shares, price: t.price })
+            } else if (t.type === 'SELL') {
+              let rem = t.shares
+              while (rem > 0.00001 && lots[sym].length > 0) {
+                const lot = lots[sym][0]
+                const filled = Math.min(lot.shares, rem)
+                lot.shares -= filled
+                rem -= filled
+                if (lot.shares < 0.00001) lots[sym].shift()
+              }
+            }
+            txIdx++
+          }
+
+          // Calculează NAV = valoarea tuturor pozițiilor la prețul zilei
+          let nav = cashTotal // cash e constant pentru simplitate
+          Object.entries(lots).forEach(([sym, symLots]) => {
+            const shares = symLots.reduce((s, l) => s + l.shares, 0)
+            if (shares < 0.00001) return
+            const px = priceMap[sym]?.[date]
+            if (px) nav += shares * px
+          })
+          navByDate[date] = nav
+        }
+
+        const navDates = Object.keys(navByDate).sort()
+        if (navDates.length < 30) return
+
+        // Returnuri zilnice ale portofoliului
+        const portRets = navDates.slice(1).map((d, i) => {
+          const prev = navByDate[navDates[i]]
+          const cur  = navByDate[d]
+          return prev > 0 ? (cur - prev) / prev : 0
+        })
+
+        // Returnuri zilnice SP500
+        const spMap = {}
+        spHist.forEach(p => { spMap[p.date] = p.close })
+        const spRets = navDates.slice(1).map((d, i) => {
+          const prevDate = navDates[i]
+          if (!spMap[d] || !spMap[prevDate]) return null
+          return (spMap[d] - spMap[prevDate]) / spMap[prevDate]
+        }).filter(r => r != null)
+
+        if (portRets.length < 20) return
+
+        // Sharpe = (mean_ret_zilnic - rf_zilnic) / std_ret_zilnic × √252
+        const rf_daily = 0.045 / 252
+        const mean = portRets.reduce((s, v) => s + v, 0) / portRets.length
+        const std  = Math.sqrt(portRets.reduce((s, v) => s + (v - mean) ** 2, 0) / portRets.length)
+        if (std === 0 || cancelled) return
+
+        setSharpe(parseFloat(((mean - rf_daily) / std * Math.sqrt(252)).toFixed(2)))
+      } catch {}
+    }
+
+    calcRealSharpe()
+    return () => { cancelled = true }
+  }, [txs.length, positions.length, cashTotal])
 
   const totalInvested = agg.totalCostBasis + cashTotal
   const totalActual   = agg.totalCurValue  + cashTotal
@@ -226,6 +305,24 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
   const pnlPositive   = pnlReal >= 0
   const pnlColor      = pnlPositive ? 'var(--green)' : 'var(--red)'
   const pnlArrow      = pnlPositive ? '▲' : '▼'
+
+  // ── P&L ZILNIC — sumă (curPrice - prevClose) × shares ──────
+  const { dailyPnl, dailyPct } = useMemo(() => {
+    let pnl = 0
+    let costBase = 0
+    positions.forEach(p => {
+      const pd = prices[p.symbol]
+      if (!pd?.price || !pd?.prev) return
+      const dayChange = (pd.price - pd.prev) * p.shares
+      pnl += dayChange
+      costBase += pd.prev * p.shares
+    })
+    const pct = costBase > 0 ? (pnl / costBase) * 100 : 0
+    return { dailyPnl: pnl, dailyPct: pct }
+  }, [positions, prices])
+
+  const dailyPositive = dailyPnl >= 0
+  const dailyColor    = dailyPositive ? 'var(--green)' : 'var(--red)'
 
   // Best & Worst — unic pe symbol
   const symMap = {}
@@ -293,7 +390,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
           <div style={{ paddingRight: 16 }}>
             <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.07em', marginBottom: 5 }}>TOTAL INVESTIT</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1 }}>
-              {fmt(totalInvested)}
+              {fmtV(totalInvested)}
             </div>
           </div>
           {/* Separator */}
@@ -302,7 +399,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
           <div style={{ paddingLeft: 16 }}>
             <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.07em', marginBottom: 5 }}>VALOARE ACTUALĂ</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1 }}>
-              {fmt(totalActual)}
+              {fmtV(totalActual)}
             </div>
           </div>
         </div>
@@ -311,7 +408,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.07em' }}>P&L TOTAL</span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: pnlColor }}>
-              {pnlArrow} {fmt(Math.abs(pnlReal))}
+              {pnlArrow} {fmtV(Math.abs(pnlReal))}
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: pnlColor, opacity: .85 }}>
               ({pnlPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
@@ -328,7 +425,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
         <div className="card" style={{ padding: '10px 12px', borderLeft: `2px solid ${agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}` }}>
           <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>NEREALIZAT</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {fmt(agg.totalUnrealized)}
+            {fmtV(agg.totalUnrealized)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {agg.uPct >= 0 ? '+' : ''}{agg.uPct.toFixed(2)}%
@@ -338,7 +435,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
         <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--purple)' }}>
           <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>REALIZAT</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {fmt(agg.totalRealized)}
+            {fmtV(agg.totalRealized)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {agg.rPct >= 0 ? '+' : ''}{agg.rPct.toFixed(2)}%
@@ -348,7 +445,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
         <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--gold)' }}>
           <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>💵 CASH</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
-            {fmt(cashTotal)}
+            {fmtV(cashTotal)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
             {cashPct.toFixed(1)}% din port.
@@ -399,6 +496,31 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
             </div>
           </div>
 
+          {/* P&L Zilnic — card lat */}
+          <div className="card" style={{ padding: '10px 14px', marginBottom: 8, borderLeft: `2px solid ${dailyColor}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>
+                  📅 P&L AZI
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: dailyColor }}>
+                    {dailyPositive ? '+' : ''}{fmtV(dailyPnl)}
+                  </span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: dailyColor, opacity: .85 }}>
+                    ({dailyPositive ? '+' : ''}{dailyPct.toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 4 }}>față de închiderea de ieri</div>
+                <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                  {positions.length} poziții active
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Best + Worst */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--green)' }}>
@@ -417,7 +539,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>profit</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>+{fmt(best.unrealizedPnl)}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>+{fmtV(best.unrealizedPnl)}</span>
                     </div>
                   </div>
                 </>
@@ -440,7 +562,7 @@ function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta })
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>pierdere</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{fmt(worst.unrealizedPnl)}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{fmtV(worst.unrealizedPnl)}</span>
                     </div>
                   </div>
                 </>
@@ -463,10 +585,17 @@ export default function Dashboard() {
   const companyInfo = useStore(s => s.companyInfo)
   const cloudLoading = useStore(s => s.cloudLoading)
   const pricesLoading = useStore(s => s.pricesLoading)
+  const restoreSession = useStore(s => s.restoreSession)
   const hasCachedData = Object.keys(prices).length>0 || txs.length>0
   const isFirstLoad = cloudLoading && !hasCachedData
   const [chartTab, setChartTab] = useState('perf')
   const [notifPerm, setNotifPerm] = useState(typeof Notification!=='undefined' ? Notification.permission : 'unsupported')
+
+  // Restaurează sesiunea admin și înregistrează periodic sync la mount
+  useEffect(() => {
+    restoreSession()
+    registerPeriodicSync()
+  }, [])
 
   useEffect(() => {
     if (notifPerm !== 'granted') return
@@ -530,11 +659,11 @@ export default function Dashboard() {
       <PortfolioSummary
         agg={agg}
         positions={positions}
-        closedPositions={closedPositions}
+        txs={txs}
+        prices={prices}
         cashTotal={cashTotal}
         cashPct={cashPct}
         portfolioBeta={portfolioBeta}
-        betas={betas}
       />
 
       {positions.length>0 && (
@@ -572,4 +701,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
