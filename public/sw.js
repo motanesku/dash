@@ -125,7 +125,10 @@ async function checkAlerts() {
 
     for (const [sym, cfg] of Object.entries(alerts)) {
       const price = prices[sym]?.price;
-      const dayChange = prices[sym]?.dayChange;
+      const prev = prices[sym]?.prev;
+      const dayChange = (price != null && prev != null && prev > 0)
+        ? ((price - prev) / prev) * 100
+        : null;
 
       // Target Price
       if (cfg.targetPrice && price != null && price >= parseFloat(cfg.targetPrice)) {
@@ -200,4 +203,3 @@ self.addEventListener('notificationclick', e => {
     })
   );
 });
-
