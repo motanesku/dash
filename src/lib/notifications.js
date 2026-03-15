@@ -27,6 +27,7 @@ export async function registerPeriodicSync() {
 
 // ── Trimite alertele la Service Worker pentru verificare background ──
 // Apelat la fiecare update de prețuri din store
+// alerts = obiect { [symbol]: {targetPrice, stopLoss, ...} }
 export async function syncAlertsToSW(alerts, prices) {
   if (!('serviceWorker' in navigator)) return;
   try {
@@ -64,4 +65,3 @@ export function sendLocalNotification(title, body, tag = 'ptf-alert') {
     });
   });
 }
-
