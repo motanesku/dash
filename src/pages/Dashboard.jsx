@@ -411,7 +411,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
               {pnlArrow} {fmtV(Math.abs(pnlReal))}
             </span>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: pnlColor, opacity: .85 }}>
-              ({pnlPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
+              ({pnlPositive ? '+' : ''}{(+pnlPct||0).toFixed(2)}%)
             </span>
           </div>
           <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', opacity: .7 }}>
@@ -428,7 +428,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
             {fmtV(agg.totalUnrealized)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {agg.uPct >= 0 ? '+' : ''}{agg.uPct.toFixed(2)}%
+            {agg.uPct >= 0 ? '+' : ''}{(+agg.uPct||0).toFixed(2)}%
           </div>
         </div>
 
@@ -438,7 +438,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
             {fmtV(agg.totalRealized)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {agg.rPct >= 0 ? '+' : ''}{agg.rPct.toFixed(2)}%
+            {agg.rPct >= 0 ? '+' : ''}{(+agg.rPct||0).toFixed(2)}%
           </div>
         </div>
 
@@ -448,7 +448,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
             {fmtV(cashTotal)}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
-            {cashPct.toFixed(1)}% din port.
+            {(+cashPct||0).toFixed(1)}% din port.
           </div>
         </div>
       </div>
@@ -508,7 +508,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
                     {dailyPositive ? '+' : ''}{fmtV(dailyPnl)}
                   </span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: dailyColor, opacity: .85 }}>
-                    ({dailyPositive ? '+' : ''}{dailyPct.toFixed(2)}%)
+                    ({dailyPositive ? '+' : ''}{(+dailyPct||0).toFixed(2)}%)
                   </span>
                 </div>
               </div>
@@ -535,7 +535,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>randament</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>+{best.unrealizedPct.toFixed(2)}%</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>{(+best.unrealizedPct||0) >= 0 ? '+' : ''}{(+best.unrealizedPct||0).toFixed(2)}%</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>profit</span>
@@ -558,7 +558,7 @@ function PortfolioSummary({ agg, positions, txs, cashTotal, cashPct, portfolioBe
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>randament</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>{worst.unrealizedPct.toFixed(2)}%</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 700 }}>{(+worst.unrealizedPct||0).toFixed(2)}%</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>pierdere</span>
