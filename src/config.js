@@ -1,11 +1,8 @@
 // ╔══════════════════════════════════════════════════════════╗
-// ║  CONFIGURARE — editează valorile de mai jos             ║
+// ║  CONFIGURARE — doar URL-uri publice aici                ║
+// ║  Secretele (PIN, API_TOKEN) se pun EXCLUSIV în          ║
+// ║  Cloudflare Worker → Settings → Environment Variables  ║
 // ╚══════════════════════════════════════════════════════════╝
-
-export const ADMIN_PIN = '1980'; // ← schimbă PIN-ul!
-
-// URL-ul Apps Script (din Google Sheets → Extensions → Apps Script → Deploy)
-export const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-BbYNaEuFO_J3fnITJrK1PmC8ARdzgZAvdss6-MEXUkm6mGcZN-Smc36Z8u3Hd4w/exec';
 
 // URL-ul Cloudflare Worker
 export const WORKER_URL = 'https://worker.danut-fagadau.workers.dev';
