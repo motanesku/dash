@@ -112,17 +112,20 @@ export function saveBrokers(brokers) {
   try { localStorage.setItem(BROKERS_KEY, JSON.stringify(brokers)) } catch {}
 }
 
-// ── Price Alerts — localStorage per device ─────────────────
-// Format obiect: { [symbol]: { targetPrice, stopLoss, dayChangePct, vixPrag } }
-// Aceeași cheie și format ca alerts.js — un singur sistem
-const ALERTS_KEY_UNIFIED = 'ptf_v1_alerts'
-
+// ── Price Alerts store (array) — pentru AlertsPanel ────────
+// Format array: [{id, symbol, target, direction, triggered}]
+// Cheie separată de alerts.js care folosește format obiect pt Positions
 export function loadAlerts() {
-  try { return JSON.parse(localStorage.getItem(ALERTS_KEY_UNIFIED)) || {} } catch { return {} }
+  try {
+    const s = localStorage.getItem(ALERTS_KEY)
+    if (!s) return []
+    const parsed = JSON.parse(s)
+    return Array.isArray(parsed) ? parsed : []
+  } catch { return [] }
 }
 
 export function saveAlerts(alerts) {
-  try { localStorage.setItem(ALERTS_KEY_UNIFIED, JSON.stringify(alerts)) } catch {}
+  try { localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts)) } catch {}
 }
 
 // Alerte locale per device — fără cloud sync
