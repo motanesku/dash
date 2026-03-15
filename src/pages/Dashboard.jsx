@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import useStore from '../lib/store.js'
-import { requestNotificationPermission, registerPeriodicSync } from '../lib/notifications.js'
+import { requestNotificationPermission } from '../lib/notifications.js'
 import { loadAlerts, checkAndNotify } from '../lib/alerts.js'
 import FearGreedBanner from '../components/FearGreedBanner.jsx'
 import MarketCards from '../components/MarketCards.jsx'
@@ -585,17 +585,11 @@ export default function Dashboard() {
   const companyInfo = useStore(s => s.companyInfo)
   const cloudLoading = useStore(s => s.cloudLoading)
   const pricesLoading = useStore(s => s.pricesLoading)
-  const restoreSession = useStore(s => s.restoreSession)
   const hasCachedData = Object.keys(prices).length>0 || txs.length>0
   const isFirstLoad = cloudLoading && !hasCachedData
   const [chartTab, setChartTab] = useState('perf')
   const [notifPerm, setNotifPerm] = useState(typeof Notification!=='undefined' ? Notification.permission : 'unsupported')
 
-  // Restaurează sesiunea admin și înregistrează periodic sync la mount
-  useEffect(() => {
-    restoreSession()
-    registerPeriodicSync()
-  }, [])
 
   useEffect(() => {
     if (notifPerm !== 'granted') return
