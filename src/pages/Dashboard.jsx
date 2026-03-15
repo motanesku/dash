@@ -153,43 +153,70 @@ function SkeletonCard() {
   )
 }
 
-// ── Sharpe Ratio (simplified, pe returnuri zilnice disponibile) ─
-function calcSharpe(positions, betas) {
-  // Folosim beta ca proxy pentru volatilitate dacă nu avem returnuri istorice
-  // Sharpe simplificat: uPct_anualizat / (beta * stdev_SP500)
-  // Returnam null dacă nu avem date suficiente
-  return null // placeholder — override mai jos cu calcul real
+
+// ── Helper: formatează valoare fără sufix USD ───────────────
+function fmt(val) {
+  if (val == null) return '—'
+  const abs = Math.abs(val)
+  const sign = val < 0 ? '-' : ''
+  return sign + new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(abs)
 }
 
-// ── Portfolio Summary Component ─────────────────────────────
-function PortfolioSummary({ agg, positions, closedPositions, cashTotal, cashPct, portfolioBeta, betas }) {
+// ── Bottom-sheet tooltip la tap ──────────────────────────────
+function MetricTooltip({ visible, onClose, title, lines }) {
+  if (!visible) return null
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'flex-end',
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--surface)', border: '1px solid var(--border2)',
+        borderRadius: '16px 16px 0 0', padding: '20px 20px 36px',
+        width: '100%', maxWidth: 480, margin: '0 auto',
+        boxShadow: '0 -4px 32px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ width: 36, height: 4, background: 'var(--border2)', borderRadius: 2, margin: '0 auto 16px' }}/>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {lines.map((l, i) => (
+            <div key={i} style={{ padding: '10px 12px', background: 'var(--bg2)', borderRadius: 8, borderLeft: `3px solid ${l.color || 'var(--border)'}` }}>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: l.color || 'var(--text)', marginBottom: 3 }}>{l.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{l.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Portfolio Summary ─────────────────────────────────────────
+function PortfolioSummary({ agg, positions, cashTotal, cashPct, portfolioBeta }) {
+  const companyInfo = useStore(s => s.companyInfo)
   const [sharpe, setSharpe] = useState(null)
   const [spHistory, setSpHistory] = useState(null)
+  const [tooltip, setTooltip] = useState(null) // 'beta' | 'sharpe' | null
 
-  // Calculăm Sharpe din returnuri SP500 + portofoliu (aproximat pe costBasis)
   useEffect(() => {
     fetchHistory('^GSPC', '1y').then(pts => setSpHistory(pts)).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!spHistory || !positions.length) return
-    // Returnuri zilnice SP500
     const spRets = spHistory.slice(1).map((p, i) => (p.close - spHistory[i].close) / spHistory[i].close)
     if (spRets.length < 30) return
-    const meanSp  = spRets.reduce((s, v) => s + v, 0) / spRets.length
-    const stdSp   = Math.sqrt(spRets.reduce((s, v) => s + (v - meanSp) ** 2, 0) / spRets.length)
-    // P&L% portofoliu anualizat
+    const meanSp = spRets.reduce((s, v) => s + v, 0) / spRets.length
+    const stdSp  = Math.sqrt(spRets.reduce((s, v) => s + (v - meanSp) ** 2, 0) / spRets.length)
     const totalInv = agg.totalCostBasis + cashTotal
     const totalVal = agg.totalCurValue  + cashTotal
     const retAnn   = totalInv > 0 ? (totalVal - totalInv) / totalInv : 0
-    // Risk-free rate ~4.5% anual (~0.018% zilnic)
-    const rf = 0.045
-    // Std portofoliu ≈ beta × std SP500 × sqrt(252)
-    const beta  = portfolioBeta ?? 1
-    const stdAnn = beta * stdSp * Math.sqrt(252)
+    const stdAnn   = (portfolioBeta ?? 1) * stdSp * Math.sqrt(252)
     if (stdAnn === 0) return
-    const s = (retAnn - rf) / stdAnn
-    setSharpe(parseFloat(s.toFixed(2)))
+    setSharpe(parseFloat(((retAnn - 0.045) / stdAnn).toFixed(2)))
   }, [spHistory, positions, agg, cashTotal, portfolioBeta])
 
   const totalInvested = agg.totalCostBasis + cashTotal
@@ -200,208 +227,216 @@ function PortfolioSummary({ agg, positions, closedPositions, cashTotal, cashPct,
   const pnlColor      = pnlPositive ? 'var(--green)' : 'var(--red)'
   const pnlArrow      = pnlPositive ? '▲' : '▼'
 
-  // Top 3 concentrare
-  const totalStocuri = positions.reduce((s, p) => s + (p.curValue || 0), 0)
-  const sortedByVal  = [...positions].sort((a, b) => (b.curValue || 0) - (a.curValue || 0))
-  const top3         = sortedByVal.slice(0, 3)
-  const top3Pct      = top3.reduce((s, p) => s + (p.curValue || 0), 0) / (totalActual || 1) * 100
+  // Best & Worst — unic pe symbol
+  const symMap = {}
+  positions.forEach(p => {
+    if (!symMap[p.symbol]) symMap[p.symbol] = { ...p }
+    else symMap[p.symbol].unrealizedPnl = (symMap[p.symbol].unrealizedPnl || 0) + (p.unrealizedPnl || 0)
+  })
+  const uniq  = Object.values(symMap).filter(p => p.unrealizedPct != null)
+  const best  = uniq.length ? uniq.reduce((a, b) => b.unrealizedPct > a.unrealizedPct ? b : a) : null
+  const worst = uniq.length ? uniq.reduce((a, b) => b.unrealizedPct < a.unrealizedPct ? b : a) : null
 
-  // Best & Worst (pe % nerealizat)
-  const withPct = positions.filter(p => p.unrealizedPct != null)
-  const best    = withPct.length ? withPct.reduce((a, b) => (b.unrealizedPct > a.unrealizedPct ? b : a)) : null
-  const worst   = withPct.length ? withPct.reduce((a, b) => (b.unrealizedPct < a.unrealizedPct ? b : a)) : null
-
-  // Sharpe label
   function sharpeLabel(s) {
-    if (s == null) return { text: 'Se calculează...', color: 'var(--text3)' }
-    if (s > 2)    return { text: 'Excelent',   color: 'var(--green)',  emoji: '🏆' }
-    if (s > 1)    return { text: 'Bun',         color: '#34d399',       emoji: '✅' }
-    if (s > 0)    return { text: 'Acceptabil',  color: '#f0b429',       emoji: '📊' }
-    if (s > -1)   return { text: 'Slab',        color: '#fb923c',       emoji: '⚠️' }
-    return               { text: 'Negativ',     color: 'var(--red)',    emoji: '🔻' }
+    if (s == null) return { text: 'Se calculează...', color: 'var(--text3)', emoji: '' }
+    if (s > 2)  return { text: 'Excelent',  color: 'var(--green)', emoji: '🏆' }
+    if (s > 1)  return { text: 'Bun',        color: '#34d399',      emoji: '✅' }
+    if (s > 0)  return { text: 'Acceptabil', color: '#f0b429',      emoji: '📊' }
+    if (s > -1) return { text: 'Slab',       color: '#fb923c',      emoji: '⚠️' }
+    return             { text: 'Negativ',    color: 'var(--red)',   emoji: '🔻' }
   }
 
   const betaLbl   = portfolioBeta != null ? betaLabel(portfolioBeta) : null
   const sharpeLbl = sharpeLabel(sharpe)
 
+  const BETA_LINES = [
+    { label: 'Ce este Beta?', color: 'var(--blue)', desc: 'Măsoară sensibilitatea portofoliului față de S&P 500. Calculat pe ultimul an de tranzacționare.' },
+    { label: 'β < 1  —  Defensiv', color: '#34d399', desc: 'Portofoliul se mișcă mai puțin decât piața. Risc mai mic, randament potențial mai mic.' },
+    { label: 'β = 1  —  Neutru', color: 'var(--text3)', desc: 'Portofoliul urmărește piața 1:1.' },
+    { label: 'β > 1  —  Agresiv', color: '#f0b429', desc: 'La o mișcare de 10% a S&P 500, portofoliul se mișcă proporțional mai mult.' },
+    { label: `Valoarea ta: β ${portfolioBeta?.toFixed(2) ?? '—'}`, color: betaLbl?.color, desc: betaLbl ? `${betaLbl.emoji} ${betaLbl.text}. La o mișcare de 10% în piață, portofoliul tău se mișcă ~${((portfolioBeta ?? 0) * 10).toFixed(1)}%.` : '—' },
+  ]
+
+  const SHARPE_LINES = [
+    { label: 'Ce este Sharpe Ratio?', color: 'var(--blue)', desc: 'Arată câte unități de randament obții pentru fiecare unitate de risc. Cu cât mai mare, cu atât mai bine.' },
+    { label: 'Formula simplificată', color: 'var(--text3)', desc: '(Randament portofoliu − Rata fără risc 4.5%) ÷ Volatilitate estimată' },
+    { label: 'Sharpe > 1  —  Bun', color: '#34d399', desc: 'Randamentul justifică riscul asumat.' },
+    { label: 'Sharpe 0–1  —  Acceptabil', color: '#f0b429', desc: 'Risc parțial justificat, există loc de optimizare.' },
+    { label: 'Sharpe < 0  —  Negativ', color: 'var(--red)', desc: 'Randamentul este sub rata fără risc. Riscul nu este compensat.' },
+    { label: `Valoarea ta: ${sharpe?.toFixed(2) ?? '—'}`, color: sharpeLbl.color, desc: `${sharpeLbl.emoji} ${sharpeLbl.text}` },
+  ]
+
   if (!positions.length && cashTotal === 0) return null
 
   return (
     <div style={{ marginBottom: 20 }}>
+      <MetricTooltip visible={tooltip === 'beta'}   onClose={() => setTooltip(null)} title="β Beta Portofoliu" lines={BETA_LINES} />
+      <MetricTooltip visible={tooltip === 'sharpe'} onClose={() => setTooltip(null)} title="📐 Sharpe Ratio"   lines={SHARPE_LINES} />
+
       {/* Titlu */}
       <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-          textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
           📋 Sumar Portofoliu
         </span>
         {positions.length > 0 && (
           <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
-            · {[...new Set(positions.map(p => p.symbol))].length} tickere deschise
+            · {[...new Set(positions.map(p => p.symbol))].length} tickere
           </span>
         )}
       </div>
 
       {/* ── Rând 1: Card principal ── */}
-      <div className="card fade-up" style={{
-        padding: '18px 20px', marginBottom: 10,
-        borderLeft: `3px solid ${pnlColor}`,
-        background: 'var(--surface)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)',
-              fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>TOTAL INVESTIT</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
-              {fmtC(totalInvested)}
+      <div className="card fade-up" style={{ padding: '16px 18px', marginBottom: 10, borderLeft: `3px solid ${pnlColor}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', alignItems: 'start' }}>
+          {/* Stânga */}
+          <div style={{ paddingRight: 16 }}>
+            <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.07em', marginBottom: 5 }}>TOTAL INVESTIT</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1 }}>
+              {fmt(totalInvested)}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4, fontFamily: 'var(--mono)' }}>
-              {positions.length} stocuri · {fmtC(cashTotal)} cash
-            </div>
+            <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 5, fontFamily: 'var(--mono)' }}>incl. cash disponibil</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)',
-              fontWeight: 600, letterSpacing: '.06em', marginBottom: 6 }}>VALOARE ACTUALĂ</div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>
-              {fmtC(totalActual)}
+          {/* Separator */}
+          <div style={{ background: 'var(--border)', alignSelf: 'stretch' }}/>
+          {/* Dreapta */}
+          <div style={{ paddingLeft: 16 }}>
+            <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.07em', marginBottom: 5 }}>VALOARE ACTUALĂ</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: 'var(--text)', lineHeight: 1.1 }}>
+              {fmt(totalActual)}
             </div>
-            <div style={{ fontFamily: 'var(--mono)', fontSize: 14, fontWeight: 700,
-              color: pnlColor, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-              <span>{pnlArrow}</span>
-              <span>{fmtC(Math.abs(pnlReal))}</span>
-              <span style={{ fontSize: 11, opacity: .85 }}>({pnlPositive ? '+' : '-'}{Math.abs(pnlPct).toFixed(2)}%)</span>
-            </div>
+            <div style={{ fontSize: 9, color: 'var(--text3)', marginTop: 5, fontFamily: 'var(--mono)' }}>incl. cash disponibil</div>
           </div>
+        </div>
+        {/* P&L */}
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 12, paddingTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--text3)', fontWeight: 600, letterSpacing: '.07em' }}>P&L TOTAL</span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: pnlColor }}>
+            {pnlArrow} {fmt(Math.abs(pnlReal))}
+          </span>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: pnlColor, opacity: .85 }}>
+            ({pnlPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
+          </span>
         </div>
       </div>
 
       {/* ── Rând 2: Nerealizat / Realizat / Cash ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-        {/* Nerealizat */}
-        <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}` }}>
-          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>NEREALIZAT</div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700,
-            color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {fmtC(agg.totalUnrealized)}
+        <div className="card" style={{ padding: '10px 12px', borderLeft: `2px solid ${agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)'}` }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>NEREALIZAT</div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {fmt(agg.totalUnrealized)}
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 3,
-            color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalUnrealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {agg.uPct >= 0 ? '+' : ''}{agg.uPct.toFixed(2)}%
           </div>
         </div>
 
-        {/* Realizat */}
-        <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--purple)' }}>
-          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>
-            REALIZAT <span style={{ fontSize: 8, opacity: .6 }}>(info)</span>
+        <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--purple)' }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>
+            REALIZAT <span style={{ fontSize: 8, opacity: .5 }}>(info)</span>
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700,
-            color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
-            {fmtC(agg.totalRealized)}
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            {fmt(agg.totalRealized)}
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 3,
-            color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, marginTop: 2, color: agg.totalRealized >= 0 ? 'var(--green)' : 'var(--red)' }}>
             {agg.rPct >= 0 ? '+' : ''}{agg.rPct.toFixed(2)}%
           </div>
         </div>
 
-        {/* Cash */}
-        <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--gold)' }}>
-          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>💵 CASH</div>
+        <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--gold)' }}>
+          <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>💵 CASH</div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--gold)' }}>
-            {fmtC(cashTotal)}
+            {fmt(cashTotal)}
           </div>
-          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
             {cashPct.toFixed(1)}% port.
           </div>
         </div>
       </div>
 
-      {/* ── Titlu Analiză ── */}
+      {/* ── Metrici Risc ── */}
       {positions.length > 0 && (
         <>
           <div style={{ marginBottom: 8, marginTop: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-              textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
               🔬 Metrici Risc
             </span>
+            <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', opacity: .7 }}>· tap pe card</span>
           </div>
 
-          {/* ── Rând 3: Beta + Sharpe (card mic x2) ── */}
+          {/* Beta + Sharpe */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            {/* Beta */}
-            <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${betaLbl?.color || 'var(--border)'}` }}>
-              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>BETA PORTOFOLIU</div>
+            <div className="card" onClick={() => setTooltip('beta')} style={{
+              padding: '10px 12px', borderLeft: `2px solid ${betaLbl?.color || 'var(--border)'}`, cursor: 'pointer', userSelect: 'none',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>BETA</div>
+                <span style={{ fontSize: 10, color: 'var(--text3)', opacity: .5 }}>ℹ</span>
+              </div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: betaLbl?.color || 'var(--text)' }}>
                 β {portfolioBeta != null ? portfolioBeta.toFixed(2) : '—'}
               </div>
-              <div style={{ fontSize: 10, color: betaLbl?.color || 'var(--text3)', marginTop: 3 }}>
+              <div style={{ fontSize: 10, color: betaLbl?.color || 'var(--text3)', marginTop: 2 }}>
                 {betaLbl ? `${betaLbl.emoji} ${betaLbl.text}` : '—'}
               </div>
             </div>
 
-            {/* Sharpe */}
-            <div className="card" style={{ padding: '12px 14px', borderLeft: `2px solid ${sharpeLbl.color}` }}>
-              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>SHARPE RATIO</div>
+            <div className="card" onClick={() => setTooltip('sharpe')} style={{
+              padding: '10px 12px', borderLeft: `2px solid ${sharpeLbl.color}`, cursor: 'pointer', userSelect: 'none',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>SHARPE</div>
+                <span style={{ fontSize: 10, color: 'var(--text3)', opacity: .5 }}>ℹ</span>
+              </div>
               <div style={{ fontFamily: 'var(--mono)', fontSize: 16, fontWeight: 700, color: sharpeLbl.color }}>
                 {sharpe != null ? sharpe.toFixed(2) : '—'}
               </div>
-              <div style={{ fontSize: 10, color: sharpeLbl.color, marginTop: 3 }}>
-                {sharpeLbl.emoji ? `${sharpeLbl.emoji} ${sharpeLbl.text}` : sharpeLbl.text}
+              <div style={{ fontSize: 10, color: sharpeLbl.color, marginTop: 2 }}>
+                {sharpeLbl.emoji} {sharpeLbl.text}
               </div>
             </div>
           </div>
 
-          {/* ── Rând 4: Best + Worst ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-            <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--green)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>🏆 BEST</div>
-              {best ? <>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{best.symbol}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', fontWeight: 600, marginTop: 3 }}>
-                  +{best.unrealizedPct.toFixed(2)}% · {fmtC(best.unrealizedPnl)}
-                </div>
-              </> : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
-            </div>
-
-            <div className="card" style={{ padding: '12px 14px', borderLeft: '2px solid var(--red)' }}>
-              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 5 }}>📉 WORST</div>
-              {worst ? <>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{worst.symbol}</div>
-                <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', fontWeight: 600, marginTop: 3 }}>
-                  {worst.unrealizedPct.toFixed(2)}% · {fmtC(worst.unrealizedPnl)}
-                </div>
-              </> : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
-            </div>
-          </div>
-
-          {/* ── Rând 5: Concentrare TOP 3 (card lat) ── */}
-          <div className="card" style={{ padding: '12px 16px', borderLeft: '2px solid var(--blue)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em' }}>
-                📊 CONCENTRARE TOP 3
-              </div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: top3Pct > 60 ? 'var(--red)' : top3Pct > 40 ? '#f0b429' : 'var(--green)',
-                fontWeight: 600 }}>
-                {top3Pct.toFixed(1)}% din port.
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {top3.map((p, i) => {
-                const pct = totalActual > 0 ? (p.curValue || 0) / totalActual * 100 : 0
-                const barW = top3[0]?.curValue > 0 ? (p.curValue || 0) / top3[0].curValue * 100 : 0
-                const colors = ['#58a6ff', '#00d4aa', '#a78bfa']
-                return (
-                  <div key={p.symbol} style={{ display: 'grid', gridTemplateColumns: '52px 1fr 36px', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{p.symbol}</span>
-                    <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${barW}%`, background: colors[i], borderRadius: 3, transition: 'width 1s ease' }}/>
-                    </div>
-                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', textAlign: 'right' }}>
-                      {pct.toFixed(1)}%
+          {/* Best + Worst */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--green)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>🏆 BEST</div>
+              {best ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{best.symbol}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {companyInfo[best.symbol]?.name?.split(' ').slice(0, 2).join(' ') || ''}
                     </span>
                   </div>
-                )
-              })}
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--green)', fontWeight: 600, marginTop: 4 }}>
+                    +{best.unrealizedPct.toFixed(2)}%
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--green)', marginTop: 1 }}>
+                    +{fmt(best.unrealizedPnl)}
+                  </div>
+                </>
+              ) : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
+            </div>
+
+            <div className="card" style={{ padding: '10px 12px', borderLeft: '2px solid var(--red)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', fontWeight: 600, letterSpacing: '.05em', marginBottom: 4 }}>📉 WORST</div>
+              {worst ? (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{worst.symbol}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                      {companyInfo[worst.symbol]?.name?.split(' ').slice(0, 2).join(' ') || ''}
+                    </span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--red)', fontWeight: 600, marginTop: 4 }}>
+                    {worst.unrealizedPct.toFixed(2)}%
+                  </div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--red)', marginTop: 1 }}>
+                    {fmt(worst.unrealizedPnl)}
+                  </div>
+                </>
+              ) : <div style={{ color: 'var(--text3)', fontSize: 11 }}>—</div>}
             </div>
           </div>
         </>
@@ -409,6 +444,7 @@ function PortfolioSummary({ agg, positions, closedPositions, cashTotal, cashPct,
     </div>
   )
 }
+
 
 export default function Dashboard() {
   const txs = useStore(s => s.txs)
