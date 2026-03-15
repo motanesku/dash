@@ -133,6 +133,17 @@ export function fmtN(n, d = 4) {
   return n.toFixed(d);
 }
 
+// fmtV — format valoare fără simbol monedă (pentru UI unde USD e implicit)
+export function fmtV(n) {
+  if (n == null || isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  return sign + new Intl.NumberFormat('ro-RO', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(abs);
+}
+
 export function pnlClass(n) {
   if (n == null || isNaN(n)) return 'muted';
   return n >= 0 ? 'pos' : 'neg';
