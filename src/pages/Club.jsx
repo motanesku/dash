@@ -110,9 +110,9 @@ export default function Club() {
 
   const stats = useMemo(() => {
     const total = club.investors.reduce((s,inv) =>
-      s + club.contributions.filter(c=>c.investorId===inv.id).reduce((ss,c)=>ss+c.amount,0), 0)
+      s + club.contributions.filter(c=>c.investorId===inv.id).reduce((ss,c)=>ss+Number(c.amount||0),0), 0)
     return club.investors.map(inv => {
-      const invested = club.contributions.filter(c=>c.investorId===inv.id).reduce((s,c)=>s+c.amount,0)
+      const invested = club.contributions.filter(c=>c.investorId===inv.id).reduce((s,c)=>s+Number(c.amount||0),0)
       const stake    = total > 0 ? (invested/total)*100 : 0
       const curVal   = displayValue > 0 ? (stake/100)*displayValue : invested
       const profit   = curVal - invested
@@ -288,7 +288,7 @@ export default function Club() {
                   </tr></thead>
                   <tbody>
                     {months.map(month => {
-                      const monthTotal = club.contributions.filter(c=>c.month===month).reduce((s,c)=>s+c.amount,0)
+                      const monthTotal = club.contributions.filter(c=>c.month===month).reduce((s,c)=>s+Number(c.amount||0),0)
                       return (
                         <tr key={month}>
                           <td style={{...STICKY, fontFamily:'var(--mono)',fontSize:12,fontWeight:600,borderRight:'1px solid var(--border)'}}>{month}</td>
@@ -396,4 +396,3 @@ export default function Club() {
     </div>
   )
 }
-
