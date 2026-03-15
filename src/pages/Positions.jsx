@@ -384,7 +384,7 @@ export default function Positions({ onEditTx }) {
           <div style={{display:'flex',alignItems:'center',gap:4}}>
             <span style={{fontSize:isMobile?11:13,fontWeight:700}}>TOTAL</span>
             {totalCost>0 && <span className="mono" style={{fontSize:isMobile?10:12,fontWeight:700,color:!brokerTab?'inherit':totalUnrealized>=0?'var(--green)':'var(--red)'}}>
-              {totalUnrealized>=0?'+':''}{(totalUnrealized/totalCost*100).toFixed(1)}%
+              {totalUnrealized>=0?'+':''}{totalCost>0?(totalUnrealized/totalCost*100).toFixed(1):'0.0'}%
             </span>}
           </div>
           <span style={{fontSize:isMobile?9:10,color:!brokerTab?'inherit':'var(--text3)',fontWeight:500,marginTop:1}}>
@@ -863,6 +863,3 @@ export default function Positions({ onEditTx }) {
     </div>
   )
 }
-
-
-
