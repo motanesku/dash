@@ -81,7 +81,11 @@ export default function Header({ onPinClick, onAddTx, onImport, onAlerts, onRefr
 
         {!isAdmin
           ? <button className="btn btn-ghost btn-sm" onClick={onPinClick}>🔐 Edit</button>
-          : <button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}} onClick={()=>useStore.getState().setAdmin(false)}>Logout</button>
+          : <button className="btn btn-ghost btn-sm" style={{color:'var(--red)'}} onClick={()=>{
+            sessionStorage.removeItem('ptf_session');
+            useStore.getState().setSessionToken(null);
+            useStore.getState().setAdmin(false);
+          }}>Logout</button>
         }
       </div>
     </header>
