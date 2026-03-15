@@ -113,10 +113,15 @@ export function saveBrokers(brokers) {
 }
 
 // ── Price Alerts — localStorage per device ─────────────────
+// Format: { [symbol]: { targetPrice, stopLoss, dayChangePct, vixPrag } }
 export function loadAlerts() {
   try {
     const s = localStorage.getItem(ALERTS_KEY)
-    return s ? JSON.parse(s) : {}
+    if (!s) return {}
+    const parsed = JSON.parse(s)
+    // Dacă cumva e array (din versiune anterioară), returnează obiect gol
+    if (Array.isArray(parsed)) return {}
+    return parsed
   } catch { return {} }
 }
 
