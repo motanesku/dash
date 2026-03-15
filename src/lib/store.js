@@ -40,6 +40,24 @@ const useStore = create((set, get) => ({
   // ── Auth ────────────────────────────────────────────────
   isAdmin: false,
   setAdmin: (v) => set({ isAdmin: v }),
+  // Token JWT returnat de Worker după verificarea PIN-ului
+  // Stocat în sessionStorage — dispare la închiderea tab-ului
+  sessionToken: sessionStorage.getItem('ptf_session') || null,
+  setSessionToken: (token) => set({ sessionToken: token }),
+  // Restaurează sesiunea admin dacă există un token valid în sessionStorage
+  restoreSession: async () => {
+    const token = sessionStorage.getItem('ptf_session')
+    if (!token) return
+    try {
+      const { WORKER_URL } = await import('../config.js')
+      const r = await fetch(`${WORKER_URL}/auth/verify-token`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      const j = await r.json()
+      if (j.ok) set({ isAdmin: true, sessionToken: token })
+      else { sessionStorage.removeItem('ptf_session'); set({ sessionToken: null }) }
+    } catch {}
+  },
 
   // ── Navigation ─────────────────────────────────────────
   tab: 'dashboard',
@@ -158,6 +176,13 @@ const useStore = create((set, get) => ({
       // Cache for next visit
       writeCache(PRICES_CACHE_KEY, prices);
       writeCache(MARKET_CACHE_KEY, marketData);
+      // Sincronizează alertele la SW pentru verificare background
+      import('../lib/notifications.js').then(({ syncAlertsToSW }) => {
+        const alerts = get().alerts;
+        if (alerts && Object.keys(alerts).length) {
+          syncAlertsToSW(alerts, { ...prices, ...marketData });
+        }
+      }).catch(() => {});
     } catch (e) {
       set({ pricesLoading: false });
     }
@@ -380,5 +405,6 @@ const useStore = create((set, get) => ({
 }));
 
 export default useStore;
+
 
 
