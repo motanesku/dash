@@ -9,6 +9,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
   const [range,   setRange]   = useState('3mo')
+  const [chartReady, setChartReady] = useState(0)
 
   // ── Creează chart-ul O SINGURĂ DATĂ (când se schimbă symbol sau height) ─
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
       ro.observe(containerRef.current)
     }
 
-    setup().catch(console.error)
+    setup().then(() => setChartReady(r => r + 1)).catch(console.error)
 
     return () => {
       ro?.disconnect()
@@ -154,7 +155,7 @@ export default function PriceChart({ symbol, height = 200, showVolume = false, a
       })
 
     return () => { cancelled = true }
-  }, [symbol, range, avgPrice])
+  }, [symbol, range, avgPrice, chartReady])
 
   const RANGES = [
     { v: '1mo', l: '1L' },
