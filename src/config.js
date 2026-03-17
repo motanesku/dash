@@ -1,14 +1,13 @@
 // ╔══════════════════════════════════════════════════════════╗
-// ║  CONFIGURARE — doar URL-uri publice aici                ║
-// ║  Secretele (PIN, API_TOKEN) se pun EXCLUSIV în          ║
-// ║  Cloudflare Worker → Settings → Environment Variables  ║
+// ║  CONFIGURARE NOUĂ — CLOUDFLARE PAGES + D1                ║
 // ╚══════════════════════════════════════════════════════════╝
 
-// URL-ul Cloudflare Worker
-export const WORKER_URL = 'https://worker.danut-fagadau.workers.dev';
+// Folosim path-ul relativ '/api?endpoint='
+// Site-ul se va apela pe el însuși, eliminând orice eroare de CORS
+export const WORKER_URL = '/api?endpoint=';
 
-// Proxy Sheets prin Worker (evită CORS)
-export const SHEETS_URL = WORKER_URL + '/api/sheets';
+// URL-ul pentru API-ul nou (nu mai avem nevoie de proxy de Sheets)
+export const SHEETS_URL = WORKER_URL; 
 
 export const USE_CLOUD  = true;
 export const USE_WORKER = true;
